@@ -11,8 +11,11 @@ class Settings(BaseSettings):
     app_host: str = Field(default="0.0.0.0", env="APP_HOST")
     app_port: int = Field(default=8000, env="APP_PORT")
     
-    # Anthropic
-    anthropic_api_key: str = Field(..., env="ANTHROPIC_API_KEY")
+    # Anthropic (optional - fallback)
+    anthropic_api_key: Optional[str] = Field(None, env="ANTHROPIC_API_KEY")
+    
+    # Gemini API
+    gemini_api_key: str = Field(..., env="GEMINI_API_KEY")
     
     # Google Calendar
     google_calendar_id: str = Field(default="pgits.job@gmail.com", env="GOOGLE_CALENDAR_ID")
