@@ -9,47 +9,53 @@ from app.core.agent import ChatCalAgent
 def test_user_info_requirements():
     """Test that the agent properly tracks required user information."""
     
-    # Create a new agent
-    agent = ChatCalAgent("test_session")
-    
-    print("=== Testing User Information Requirements ===\n")
+    print("=== Testing Flexible User Information Requirements ===\n")
     
     # Test 1: Check initial state (no info collected)
     print("1. Initial state - no information collected:")
-    print(f"   Complete info: {agent.has_complete_user_info()}")
-    print(f"   Missing info: {agent.get_missing_user_info()}")
-    print(f"   User context: {agent._get_user_context()}")
+    agent1 = ChatCalAgent("test_session_1")
+    print(f"   Required info complete: {agent1.has_complete_user_info()}")
+    print(f"   Ideal info complete: {agent1.has_ideal_user_info()}")
+    print(f"   Missing required: {agent1.get_missing_user_info()}")
+    print(f"   User context: {agent1._get_user_context()}")
     print()
     
     # Test 2: Add name only
     print("2. After adding name only:")
-    agent.update_user_info("name", "John Smith")
-    print(f"   Complete info: {agent.has_complete_user_info()}")
-    print(f"   Missing info: {agent.get_missing_user_info()}")
-    print(f"   User context: {agent._get_user_context()}")
+    agent1.update_user_info("name", "John Smith")
+    print(f"   Required info complete: {agent1.has_complete_user_info()}")
+    print(f"   Missing required: {agent1.get_missing_user_info()}")
+    print(f"   User context: {agent1._get_user_context()}")
     print()
     
-    # Test 3: Add email
-    print("3. After adding email:")
-    agent.update_user_info("email", "john@example.com")
-    print(f"   Complete info: {agent.has_complete_user_info()}")
-    print(f"   Missing info: {agent.get_missing_user_info()}")
-    print(f"   User context: {agent._get_user_context()}")
+    # Test 3: Add email (should be sufficient with name)
+    print("3. After adding email (name + email = sufficient):")
+    agent1.update_user_info("email", "john@example.com")
+    print(f"   Required info complete: {agent1.has_complete_user_info()}")
+    print(f"   Ideal info complete: {agent1.has_ideal_user_info()}")
+    print(f"   Missing required: {agent1.get_missing_user_info()}")
+    print(f"   Missing ideal: {agent1.get_missing_ideal_info()}")
+    print(f"   User context: {agent1._get_user_context()}")
     print()
     
-    # Test 4: Add phone (complete information)
-    print("4. After adding phone (complete):")
-    agent.update_user_info("phone", "555-123-4567")
-    print(f"   Complete info: {agent.has_complete_user_info()}")
-    print(f"   Missing info: {agent.get_missing_user_info()}")
-    print(f"   User context: {agent._get_user_context()}")
+    # Test 4: Alternative path - name + phone only
+    print("4. Alternative: Name + phone only (no email):")
+    agent2 = ChatCalAgent("test_session_2")
+    agent2.update_user_info("name", "Jane Doe")
+    agent2.update_user_info("phone", "555-987-6543")
+    print(f"   Required info complete: {agent2.has_complete_user_info()}")
+    print(f"   Ideal info complete: {agent2.has_ideal_user_info()}")
+    print(f"   Missing required: {agent2.get_missing_user_info()}")
+    print(f"   User context: {agent2._get_user_context()}")
     print()
     
-    # Test 5: Test extraction from message
-    print("5. Testing information extraction from message:")
-    test_message = "Hi, my name is Sarah Johnson and my email is sarah@example.com. My phone is 555-987-6543."
-    extracted = agent.extract_user_info_from_message(test_message)
-    print(f"   Extracted info: {extracted}")
+    # Test 5: Add phone to first agent (ideal complete info)
+    print("5. Adding phone to first agent (ideal complete):")
+    agent1.update_user_info("phone", "555-123-4567")
+    print(f"   Required info complete: {agent1.has_complete_user_info()}")
+    print(f"   Ideal info complete: {agent1.has_ideal_user_info()}")
+    print(f"   User context: {agent1._get_user_context()}")
+    print()
     
     return True
 

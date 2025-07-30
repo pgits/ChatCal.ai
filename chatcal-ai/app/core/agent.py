@@ -112,7 +112,7 @@ Always maintain your professional yet friendly personality while collecting comp
     def _get_user_context(self) -> str:
         """Generate user context for the system prompt."""
         if not any(self.user_info.values()):
-            return "## Current User Information\n⚠️ NO USER INFORMATION COLLECTED YET - REQUIRED BEFORE BOOKING\nYou MUST collect name, email, and phone number before any appointment booking."
+            return "## Current User Information\n⚠️ NO USER INFORMATION COLLECTED YET - REQUIRED BEFORE BOOKING\nYou MUST collect name AND at least one contact method (email OR phone) before any appointment booking.\nAlternative: Offer Peter's direct number +1 630 209 7542"
         
         context = "## Current User Information\n"
         if self.user_info["name"]:
@@ -122,19 +122,30 @@ Always maintain your professional yet friendly personality while collecting comp
         if self.user_info["phone"]:
             context += f"- ✅ Phone: {self.user_info['phone']}\n"
             
-        missing = []
-        if not self.user_info["name"]:
-            missing.append("name")
-        if not self.user_info["email"]:
-            missing.append("email")
-        if not self.user_info["phone"]:
-            missing.append("phone")
+        # Check what's missing
+        missing_name = not self.user_info["name"]
+        missing_contact = not self.user_info["email"] and not self.user_info["phone"]
+        
+        if missing_name or missing_contact:
+            context += "\n⚠️ MISSING REQUIRED INFO: "
+            missing_items = []
+            if missing_name:
+                missing_items.append("NAME")
+            if missing_contact:
+                missing_items.append("CONTACT (email OR phone)")
+            context += ", ".join(missing_items) + "\n"
             
-        if missing:
-            context += f"\n⚠️ MISSING REQUIRED INFO: {', '.join(missing).upper()}\n"
-            context += "🚫 DO NOT BOOK APPOINTMENT until all information is collected!\n"
+            if missing_contact:
+                context += "💡 ALTERNATIVES: Offer Peter's direct number +1 630 209 7542 or ask for email/phone\n"
+            context += "🚫 DO NOT BOOK APPOINTMENT until required information is collected!\n"
         else:
-            context += "\n✅ ALL REQUIRED INFORMATION COLLECTED - Ready to book appointments\n"
+            # Check if we have both contacts (preferred) or just one
+            if self.user_info["email"] and self.user_info["phone"]:
+                context += "\n✅ ALL INFORMATION COLLECTED (Name + Both Contacts) - Ready to book appointments\n"
+            else:
+                contact_type = "email" if self.user_info["email"] else "phone"
+                context += f"\n✅ REQUIRED INFORMATION COLLECTED (Name + {contact_type}) - Ready to book appointments\n"
+                context += "💡 Consider asking for additional contact method for better communication\n"
             
         return context
     
@@ -150,7 +161,13 @@ Always maintain your professional yet friendly personality while collecting comp
         return self.user_info.copy()
     
     def has_complete_user_info(self) -> bool:
-        """Check if all required user information is collected."""
+        """Check if minimum required user information is collected (name + at least one contact)."""
+        has_name = bool(self.user_info.get("name"))
+        has_contact = bool(self.user_info.get("email") or self.user_info.get("phone"))
+        return has_name and has_contact
+    
+    def has_ideal_user_info(self) -> bool:
+        """Check if all preferred user information is collected (name + both contacts)."""
         return all([
             self.user_info.get("name"),
             self.user_info.get("email"), 
@@ -159,6 +176,18 @@ Always maintain your professional yet friendly personality while collecting comp
     
     def get_missing_user_info(self) -> List[str]:
         """Get list of missing required user information."""
+        missing = []
+        if not self.user_info.get("name"):
+            missing.append("name")
+        
+        # For contacts, only mark as missing if we have neither
+        if not self.user_info.get("email") and not self.user_info.get("phone"):
+            missing.append("contact (email OR phone)")
+        
+        return missing
+    
+    def get_missing_ideal_info(self) -> List[str]:
+        """Get list of missing information for ideal collection (both contacts)."""
         missing = []
         if not self.user_info.get("name"):
             missing.append("name")
