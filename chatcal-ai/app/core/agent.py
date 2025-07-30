@@ -7,6 +7,7 @@ from llama_index.core.memory import ChatMemoryBuffer
 from app.core.llm_anthropic import anthropic_llm
 from app.core.tools import CalendarTools
 from app.personality.prompts import SYSTEM_PROMPT, GREETING_TEMPLATES, ENCOURAGEMENT_PHRASES
+from app.config import settings
 import random
 
 
@@ -41,8 +42,13 @@ class ChatCalAgent:
         # Get current user context
         user_context = self._get_user_context()
         
-        # Enhanced system prompt for calendar agent
-        enhanced_system_prompt = f"""{SYSTEM_PROMPT}
+        # Enhanced system prompt for calendar agent with Peter's contact info
+        system_prompt_with_contacts = SYSTEM_PROMPT.format(
+            my_phone_number=settings.my_phone_number,
+            my_email_address=settings.my_email_address
+        )
+        
+        enhanced_system_prompt = f"""{system_prompt_with_contacts}
 
 {user_context}
 
@@ -112,7 +118,7 @@ Always maintain your professional yet friendly personality while collecting comp
     def _get_user_context(self) -> str:
         """Generate user context for the system prompt."""
         if not any(self.user_info.values()):
-            return "## Current User Information\n⚠️ NO USER INFORMATION COLLECTED YET - REQUIRED BEFORE BOOKING\nYou MUST collect name AND at least one contact method (email OR phone) before any appointment booking.\nAlternative: Offer Peter's direct number +1 630 209 7542"
+            return f"## Current User Information\n🚫 NO USER INFORMATION COLLECTED YET - REQUIRED BEFORE BOOKING\nYou MUST collect name AND at least one contact method (email OR phone) before any appointment booking.\n💡 Alternative: Offer Peter's direct number {settings.my_phone_number} or email {settings.my_email_address}\n⛔ DO NOT USE create_appointment TOOL WITHOUT CONTACT INFO ⛔"
         
         context = "## Current User Information\n"
         if self.user_info["name"]:
@@ -127,7 +133,7 @@ Always maintain your professional yet friendly personality while collecting comp
         missing_contact = not self.user_info["email"] and not self.user_info["phone"]
         
         if missing_name or missing_contact:
-            context += "\n⚠️ MISSING REQUIRED INFO: "
+            context += "\n🚫 MISSING REQUIRED INFO: "
             missing_items = []
             if missing_name:
                 missing_items.append("NAME")
@@ -136,8 +142,9 @@ Always maintain your professional yet friendly personality while collecting comp
             context += ", ".join(missing_items) + "\n"
             
             if missing_contact:
-                context += "💡 ALTERNATIVES: Offer Peter's direct number +1 630 209 7542 or ask for email/phone\n"
-            context += "🚫 DO NOT BOOK APPOINTMENT until required information is collected!\n"
+                context += f"💡 ALTERNATIVES: Offer Peter's direct number {settings.my_phone_number} or email {settings.my_email_address}\n"
+            context += "🚫🚫 ABSOLUTELY DO NOT USE create_appointment TOOL UNTIL REQUIRED INFO IS COLLECTED! 🚫🚫\n"
+            context += "⛔ BOOKING IS FORBIDDEN WITHOUT CONTACT INFORMATION ⛔\n"
         else:
             # Check if we have both contacts (preferred) or just one
             if self.user_info["email"] and self.user_info["phone"]:

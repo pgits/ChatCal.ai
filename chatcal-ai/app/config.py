@@ -40,6 +40,10 @@ class Settings(BaseSettings):
     # HuggingFace Settings
     tokenizers_parallelism: Optional[str] = Field(default="false", env="TOKENIZERS_PARALLELISM")
     
+    # Peter's Contact Information
+    my_phone_number: str = Field(..., env="MY_PHONE_NUMBER")
+    my_email_address: str = Field(..., env="MY_EMAIL_ADDRESS")
+    
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
