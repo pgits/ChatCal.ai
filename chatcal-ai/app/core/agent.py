@@ -219,18 +219,32 @@ Always maintain your professional yet friendly personality while collecting comp
         if emails:
             extracted['email'] = emails[0]
         
-        # Phone pattern (basic - US format)
-        phone_pattern = r'(\+?1[-.\s]?)?\(?([0-9]{3})\)?[-.\s]?([0-9]{3})[-.\s]?([0-9]{4})'
-        phones = re.findall(phone_pattern, message)
-        if phones:
-            extracted['phone'] = ''.join(phones[0])
+        # Phone pattern (multiple formats including "call me at 630 880 5488")
+        phone_patterns = [
+            r'(\+?1[-.\s]?)?\(?([0-9]{3})\)?[-.\s]?([0-9]{3})[-.\s]?([0-9]{4})',  # Standard format
+            r'call me at\s*(\d{3})[-.\s]*(\d{3})[-.\s]*(\d{4})',  # "call me at" format
+            r'phone\s*:?\s*(\d{3})[-.\s]*(\d{3})[-.\s]*(\d{4})',  # "phone:" format
+            r'(\d{3})[-.\s]+(\d{3})[-.\s]+(\d{4})'  # Simple space/dash separated
+        ]
         
-        # Name pattern (when someone says "My name is..." or "I'm...")
+        for pattern in phone_patterns:
+            matches = re.findall(pattern, message, re.IGNORECASE)
+            if matches:
+                match = matches[0]
+                if isinstance(match, tuple):
+                    # Join all non-empty parts
+                    phone_digits = ''.join([part for part in match if part])
+                    if len(phone_digits) >= 10:  # Valid phone number
+                        extracted['phone'] = phone_digits
+                        break
+        
+        # Name pattern (various formats)
         name_patterns = [
-            r"my name is ([A-Za-z\s]+)",
-            r"i'm ([A-Za-z\s]+)",
-            r"this is ([A-Za-z\s]+)",
-            r"i am ([A-Za-z\s]+)"
+            r"my name is ([A-Za-z\s]{2,30})",
+            r"i'm ([A-Za-z\s]{2,30})",
+            r"this is ([A-Za-z\s]{2,30})",
+            r"i am ([A-Za-z\s]{2,30})",
+            r"(?:^|\s)([A-Z][a-z]+(?:\s[A-Z][a-z]+)*),?\s+(?:here|speaking|calling)"  # "Betty, here" or "John Smith calling"
         ]
         
         for pattern in name_patterns:
@@ -262,9 +276,18 @@ Always maintain your professional yet friendly personality while collecting comp
             if len(message) > 1000:
                 return "That's quite a message! Could you break it down into smaller parts? I work better with shorter requests. 📝"
             
-            # Check for contact information requests first
-            contact_keywords = ['phone', 'number', 'contact', 'call', 'email', 'reach']
-            if any(keyword in message.lower() for keyword in contact_keywords) and 'peter' in message.lower():
+            # Check for explicit contact information requests (not booking requests)
+            contact_request_patterns = [
+                r"what.{0,20}peter.{0,20}(phone|number|contact)",
+                r"(phone|number|contact).{0,20}peter",
+                r"how.{0,20}(reach|contact).{0,20}peter",
+                r"peter.{0,20}(email|phone).{0,20}address"
+            ]
+            
+            is_contact_request = any(re.search(pattern, message.lower()) for pattern in contact_request_patterns)
+            is_booking_request = any(word in message.lower() for word in ['book', 'schedule', 'appointment', 'meeting', 'available', 'time'])
+            
+            if is_contact_request and not is_booking_request:
                 contact_response = f"Peter's contact information:\n📞 Phone: {settings.my_phone_number}\n📧 Email: {settings.my_email_address}\n\nI can also help you schedule an appointment with Peter through this chat. What would you prefer?"
                 return contact_response
             
