@@ -262,6 +262,12 @@ Always maintain your professional yet friendly personality while collecting comp
             if len(message) > 1000:
                 return "That's quite a message! Could you break it down into smaller parts? I work better with shorter requests. 📝"
             
+            # Check for contact information requests first
+            contact_keywords = ['phone', 'number', 'contact', 'call', 'email', 'reach']
+            if any(keyword in message.lower() for keyword in contact_keywords) and 'peter' in message.lower():
+                contact_response = f"Peter's contact information:\n📞 Phone: {settings.my_phone_number}\n📧 Email: {settings.my_email_address}\n\nI can also help you schedule an appointment with Peter through this chat. What would you prefer?"
+                return contact_response
+            
             # Extract and store user information from the message
             extracted_info = self.extract_user_info_from_message(message)
             for info_type, value in extracted_info.items():
