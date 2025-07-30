@@ -112,15 +112,15 @@ Always maintain your professional yet friendly personality while collecting comp
     def _get_user_context(self) -> str:
         """Generate user context for the system prompt."""
         if not any(self.user_info.values()):
-            return "## Current User Information\nNo user information collected yet. Please collect name, email, and phone number."
+            return "## Current User Information\n⚠️ NO USER INFORMATION COLLECTED YET - REQUIRED BEFORE BOOKING\nYou MUST collect name, email, and phone number before any appointment booking."
         
         context = "## Current User Information\n"
         if self.user_info["name"]:
-            context += f"- Name: {self.user_info['name']}\n"
+            context += f"- ✅ Name: {self.user_info['name']}\n"
         if self.user_info["email"]:
-            context += f"- Email: {self.user_info['email']}\n"
+            context += f"- ✅ Email: {self.user_info['email']}\n"
         if self.user_info["phone"]:
-            context += f"- Phone: {self.user_info['phone']}\n"
+            context += f"- ✅ Phone: {self.user_info['phone']}\n"
             
         missing = []
         if not self.user_info["name"]:
@@ -131,7 +131,10 @@ Always maintain your professional yet friendly personality while collecting comp
             missing.append("phone")
             
         if missing:
-            context += f"- Still needed: {', '.join(missing)}\n"
+            context += f"\n⚠️ MISSING REQUIRED INFO: {', '.join(missing).upper()}\n"
+            context += "🚫 DO NOT BOOK APPOINTMENT until all information is collected!\n"
+        else:
+            context += "\n✅ ALL REQUIRED INFORMATION COLLECTED - Ready to book appointments\n"
             
         return context
     
@@ -145,6 +148,25 @@ Always maintain your professional yet friendly personality while collecting comp
     def get_user_info(self) -> Dict:
         """Get current user information."""
         return self.user_info.copy()
+    
+    def has_complete_user_info(self) -> bool:
+        """Check if all required user information is collected."""
+        return all([
+            self.user_info.get("name"),
+            self.user_info.get("email"), 
+            self.user_info.get("phone")
+        ])
+    
+    def get_missing_user_info(self) -> List[str]:
+        """Get list of missing required user information."""
+        missing = []
+        if not self.user_info.get("name"):
+            missing.append("name")
+        if not self.user_info.get("email"):
+            missing.append("email")
+        if not self.user_info.get("phone"):
+            missing.append("phone")
+        return missing
     
     def extract_user_info_from_message(self, message: str) -> Dict:
         """Extract user information from user messages using simple patterns."""
