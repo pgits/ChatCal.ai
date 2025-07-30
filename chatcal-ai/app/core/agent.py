@@ -103,7 +103,7 @@ You: "Thank you, John! I have your information. Now, what type of meeting would 
 
 Always maintain your professional yet friendly personality while collecting complete user information!"""
 
-        # Create agent
+        # Create agent with explicit system prompt
         agent = ReActAgent.from_tools(
             tools=tools,
             llm=self.llm,
@@ -112,6 +112,10 @@ Always maintain your professional yet friendly personality while collecting comp
             system_prompt=enhanced_system_prompt,
             max_iterations=10
         )
+        
+        # Override the system prompt directly on the agent if possible
+        if hasattr(agent, '_system_prompt'):
+            agent._system_prompt = enhanced_system_prompt
         
         return agent
     
