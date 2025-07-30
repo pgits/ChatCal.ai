@@ -16,7 +16,7 @@ class ChatCalAgent:
     
     def __init__(self, session_id: str):
         self.session_id = session_id
-        self.calendar_tools = CalendarTools()
+        self.calendar_tools = CalendarTools(agent=self)
         self.llm = anthropic_llm.get_llm()
         
         # User information storage
