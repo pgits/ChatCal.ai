@@ -268,6 +268,8 @@ Always maintain your professional yet friendly personality while collecting comp
     
     def chat(self, message: str) -> str:
         """Process a user message and return response."""
+        import re  # Import re module for regex operations
+        
         try:
             # Validate input
             if not message or not message.strip():
