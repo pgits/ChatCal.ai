@@ -4,7 +4,7 @@ from typing import List, Dict, Optional
 from llama_index.core.agent import ReActAgent
 from llama_index.core.tools import BaseTool
 from llama_index.core.memory import ChatMemoryBuffer
-from app.core.llm_gemini import gemini_llm
+from app.core.llm_anthropic import anthropic_llm
 from app.core.tools import CalendarTools
 from app.personality.prompts import SYSTEM_PROMPT, GREETING_TEMPLATES, ENCOURAGEMENT_PHRASES
 import random
@@ -16,7 +16,7 @@ class ChatCalAgent:
     def __init__(self, session_id: str):
         self.session_id = session_id
         self.calendar_tools = CalendarTools()
-        self.llm = gemini_llm.get_llm()
+        self.llm = anthropic_llm.get_llm()
         
         # User information storage
         self.user_info = {

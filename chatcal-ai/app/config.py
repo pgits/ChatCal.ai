@@ -37,6 +37,9 @@ class Settings(BaseSettings):
     max_conversation_history: int = Field(default=20, env="MAX_CONVERSATION_HISTORY")
     session_timeout_minutes: int = Field(default=30, env="SESSION_TIMEOUT_MINUTES")
     
+    # HuggingFace Settings
+    tokenizers_parallelism: Optional[str] = Field(default="false", env="TOKENIZERS_PARALLELISM")
+    
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
