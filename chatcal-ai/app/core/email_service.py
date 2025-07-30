@@ -80,7 +80,8 @@ END:VCALENDAR"""
                             end_datetime: datetime,
                             description: str = "",
                             user_phone: str = "",
-                            meeting_type: str = "Meeting") -> bool:
+                            meeting_type: str = "Meeting",
+                            meet_link: str = "") -> bool:
         """Send a calendar invitation email."""
         
         try:
@@ -94,12 +95,12 @@ END:VCALENDAR"""
             if to_email == settings.my_email_address:
                 # Email to Peter
                 html_body = self._create_peter_email_body(
-                    title, start_datetime, end_datetime, description, to_name, user_phone
+                    title, start_datetime, end_datetime, description, to_name, user_phone, meet_link
                 )
             else:
                 # Email to user
                 html_body = self._create_user_email_body(
-                    title, start_datetime, end_datetime, description, meeting_type
+                    title, start_datetime, end_datetime, description, meeting_type, meet_link
                 )
             
             # Create plain text version
@@ -149,7 +150,7 @@ END:VCALENDAR"""
     
     def _create_peter_email_body(self, title: str, start_datetime: datetime, 
                                end_datetime: datetime, description: str, 
-                               user_name: str, user_phone: str) -> str:
+                               user_name: str, user_phone: str, meet_link: str = "") -> str:
         """Create email body for Peter."""
         
         return f"""
@@ -169,6 +170,7 @@ END:VCALENDAR"""
                 <div style="margin: 15px 0;">
                     <strong>👤 Meeting with:</strong> {user_name}<br>
                     <strong>📞 Phone:</strong> {user_phone or 'Not provided'}
+                    {f'<br><strong>🎥 Google Meet:</strong> <a href="{meet_link}" style="color: #1976d2;">{meet_link}</a>' if meet_link else ''}
                 </div>
                 
                 {f'<div style="margin: 15px 0;"><strong>📝 Details:</strong><br>{description}</div>' if description else ''}
@@ -188,7 +190,7 @@ END:VCALENDAR"""
     
     def _create_user_email_body(self, title: str, start_datetime: datetime, 
                               end_datetime: datetime, description: str, 
-                              meeting_type: str) -> str:
+                              meeting_type: str, meet_link: str = "") -> str:
         """Create email body for the user."""
         
         return f"""
@@ -209,6 +211,7 @@ END:VCALENDAR"""
                     <strong>👤 Meeting with:</strong> Peter Michael Gits<br>
                     <strong>📞 Peter's Phone:</strong> {settings.my_phone_number}<br>
                     <strong>📧 Peter's Email:</strong> {settings.my_email_address}
+                    {f'<br><strong>🎥 Google Meet Link:</strong> <a href="{meet_link}" style="color: #1976d2; font-weight: bold;">{meet_link}</a>' if meet_link else ''}
                 </div>
                 
                 {f'<div style="margin: 15px 0;"><strong>📝 Meeting Details:</strong><br>{description}</div>' if description else ''}

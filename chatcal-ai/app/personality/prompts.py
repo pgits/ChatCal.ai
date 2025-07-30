@@ -82,12 +82,15 @@ When handling appointments:
 3. If either is ❌, STOP and collect the missing information first!
 
 Types of meetings you can schedule with Peter:
-- Business consultations (60 min)
-- Professional meetings (60 min)
-- Project discussions (60 min)  
-- Quick discussions (30 min)
-- Networking meetings (30-60 min)
-- Advisory sessions (90 min)
+- Business consultations (60 min) - in-person or Google Meet
+- Professional meetings (60 min) - in-person or Google Meet
+- Project discussions (60 min) - in-person or Google Meet
+- Quick discussions (30 min) - in-person or Google Meet
+- Advisory sessions (90 min) - in-person or Google Meet
+
+**Meeting Format Options:**
+- **In-Person**: Traditional face-to-face meeting
+- **Google Meet**: Video conference call with automatic Meet link generation
 
 Remember: You're the professional gateway to Peter's calendar. Always maintain user information throughout the conversation and make the booking process smooth and professional while being friendly and approachable."""
 
@@ -138,22 +141,52 @@ CLARIFICATION_REQUESTS = {
 MEETING_TYPES = {
     "consultation": {
         "duration": 60,
-        "description": "Professional consultation with Peter Michael Gits"
+        "description": "Professional consultation with Peter Michael Gits",
+        "conference": False
+    },
+    "consultation_meet": {
+        "duration": 60,
+        "description": "Professional consultation with Peter via Google Meet",
+        "conference": True
     },
     "quick_chat": {
         "duration": 30,
-        "description": "Brief discussion with Peter"
+        "description": "Brief discussion with Peter",
+        "conference": False
+    },
+    "quick_chat_meet": {
+        "duration": 30,
+        "description": "Brief discussion with Peter via Google Meet",
+        "conference": True
     },
     "project_discussion": {
         "duration": 60,
-        "description": "Project planning or review with Peter"
+        "description": "Project planning or review with Peter",
+        "conference": False
+    },
+    "project_discussion_meet": {
+        "duration": 60,
+        "description": "Project planning or review with Peter via Google Meet",
+        "conference": True
     },
     "business_meeting": {
         "duration": 60,
-        "description": "Business meeting with Peter Michael Gits"
+        "description": "Business meeting with Peter Michael Gits",
+        "conference": False
+    },
+    "business_meeting_meet": {
+        "duration": 60,
+        "description": "Business meeting with Peter via Google Meet",
+        "conference": True
     },
     "advisory_session": {
         "duration": 90,
-        "description": "Extended advisory session with Peter"
+        "description": "Extended advisory session with Peter",
+        "conference": False
+    },
+    "advisory_session_meet": {
+        "duration": 90,
+        "description": "Extended advisory session with Peter via Google Meet",
+        "conference": True
     }
 }
