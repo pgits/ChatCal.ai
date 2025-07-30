@@ -123,24 +123,30 @@ async def root():
     </head>
     <body>
         <div class="container">
-            <h1>🌟 ChatCal.ai</h1>
+            <h1>📅 Schedule Time with Peter Michael Gits</h1>
             <p style="text-align: center; font-size: 18px; color: #666;">
-                Your friendly AI assistant for booking Google Calendar appointments
+                Book consultations, meetings, and advisory sessions with Peter
             </p>
             
-            <div class="feature">
-                <h3>💬 Natural Language Scheduling</h3>
-                <p>Book meetings with simple requests like "Schedule a meeting with John next Tuesday at 2pm"</p>
+            <div style="text-align: center; margin: 30px 0;">
+                <a href="/simple-chat" style="background: #4caf50; color: white; padding: 15px 40px; font-size: 20px; border-radius: 8px; text-decoration: none; display: inline-block;">
+                    Book an Appointment Now
+                </a>
             </div>
             
             <div class="feature">
-                <h3>📅 Smart Calendar Integration</h3>
-                <p>Automatically checks availability, prevents conflicts, and manages your Google Calendar</p>
+                <h3>💼 Professional Consultations</h3>
+                <p>Schedule one-on-one business consultations and advisory sessions with Peter Michael Gits</p>
             </div>
             
             <div class="feature">
-                <h3>🤖 AI-Powered Assistant</h3>
-                <p>Powered by Google's Gemini with a friendly, encouraging personality</p>
+                <h3>🤖 AI-Powered Scheduling</h3>
+                <p>Our intelligent assistant helps you find the perfect time that works for both you and Peter</p>
+            </div>
+            
+            <div class="feature">
+                <h3>📧 Instant Confirmation</h3>
+                <p>Receive immediate confirmation and calendar invitations for your scheduled meetings</p>
             </div>
             
             <div class="api-link">

@@ -102,18 +102,21 @@ async def simple_chat():
 </head>
 <body>
     <div class="chat-box">
-        <h1>🌟 ChatCal.ai</h1>
-        <p class="subtitle">Your AI Calendar Assistant</p>
+        <h1>📅 Book Time with Peter Michael Gits</h1>
+        <p class="subtitle">AI-Powered Scheduling Assistant</p>
         
         <div class="messages" id="messages">
             <div class="message assistant">
-                👋 Hi! I'm ChatCal, your friendly calendar assistant. I can help you:
+                👋 Welcome! I'm ChatCal, Peter Michael Gits' scheduling assistant. I'm here to help you book an appointment with Peter.
+                <br><br>
+                I can schedule:
                 <ul>
-                    <li>Check your calendar</li>
-                    <li>Schedule meetings</li>
-                    <li>Find available time slots</li>
+                    <li>Business consultations (60 min)</li>
+                    <li>Quick discussions (30 min)</li>
+                    <li>Project meetings (60 min)</li>
+                    <li>Advisory sessions (90 min)</li>
                 </ul>
-                Just ask me anything about your schedule!
+                What type of meeting would you like to schedule?
             </div>
         </div>
         
@@ -123,7 +126,7 @@ async def simple_chat():
             <input 
                 type="text" 
                 id="input" 
-                placeholder="Type your message here..."
+                placeholder="Tell me what you'd like to discuss with Peter..."
                 onkeypress="if(event.key==='Enter') send()"
             >
             <button onclick="send()" id="sendBtn">Send</button>

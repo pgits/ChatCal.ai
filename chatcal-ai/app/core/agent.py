@@ -193,20 +193,20 @@ Always maintain your friendly, jovial personality while being helpful and effici
         message = message.lower().strip()
         
         if message in ['/help', 'help', 'what can you do']:
-            return """I'm ChatCal, your friendly calendar assistant! 🌟 Here's what I can help you with:
+            return """I'm ChatCal, Peter Michael Gits' scheduling assistant! 📅 Here's how I can help you:
 
-📅 **Schedule meetings**: "Book a meeting with John next Tuesday at 2pm"
-🔍 **Check availability**: "What's my availability tomorrow?"  
-📋 **View upcoming events**: "What's on my calendar this week?"
-🔄 **Reschedule appointments**: "Move my 3pm meeting to 4pm"
+🤝 **Book a consultation with Peter**: "I'd like to schedule a business consultation"
+💼 **Schedule a meeting**: "I need a 30-minute meeting with Peter next week"
+📊 **Project discussions**: "Book time to discuss my project with Peter"
+🎯 **Advisory sessions**: "I need a 90-minute advisory session"
 
-Just tell me what you need in natural language - I understand phrases like:
-• "next Tuesday afternoon"
-• "tomorrow at 2pm" 
-• "schedule a 30-minute call"
-• "check my calendar for Friday"
+Meeting types available:
+• **Quick chat** (30 minutes) - Brief discussions
+• **Consultation** (60 minutes) - Business consultations
+• **Project meeting** (60 minutes) - Project planning/review
+• **Advisory session** (90 minutes) - Extended strategic sessions
 
-I'm here to make scheduling a breeze! What would you like to do? ✨"""
+Peter typically meets between 9 AM and 5 PM. Just tell me what you'd like to discuss and when you're available!"""
         
         elif message in ['/status', 'status']:
             available_tools = self.get_available_tools()

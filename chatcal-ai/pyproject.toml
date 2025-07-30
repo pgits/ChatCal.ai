@@ -2,20 +2,19 @@
 name = "chatcal-ai"
 version = "0.1.0"
 description = "A friendly AI chatbot for booking Google Calendar appointments"
-authors = ["pgits.job@gmail.com"]
-python = "^3.11"
+authors = ["Peter <pgits.job@gmail.com>"]
 
 [tool.poetry.dependencies]
 python = "^3.11"
 llama-index = "^0.11.0"
-llama-index-llms-anthropic = "^0.3.0"
+llama-index-llms-anthropic = "^0.3.0"  
 llama-index-llms-gemini = "^0.3.0"
-google-generativeai = "^0.8.0"
+google-generativeai = "^0.5.2"
 llama-index-tools-google = "^0.2.0"
 google-api-python-client = "^2.100.0"
 google-auth = "^2.23.0"
 google-auth-oauthlib = "^1.1.0"
-google-auth-httplib2 = "^0.1.1"
+google-auth-httplib2 = "^0.2.0"
 fastapi = "^0.104.0"
 uvicorn = "^0.24.0"
 pydantic = "^2.4.0"

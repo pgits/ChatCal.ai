@@ -14,7 +14,7 @@ services:
     depends_on:
       - redis
     volumes:
-      - ./credentials:/app/credentials:ro
+      - ./credentials:/app/credentials
     restart: unless-stopped
     networks:
       - chatcal-network
@@ -30,21 +30,21 @@ services:
     networks:
       - chatcal-network
 
-  nginx:
-    image: nginx:alpine
-    container_name: chatcal-nginx
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./docker/nginx/ssl:/etc/nginx/ssl:ro
-      - ./frontend/dist:/usr/share/nginx/html:ro
-    depends_on:
-      - api
-    restart: unless-stopped
-    networks:
-      - chatcal-network
+# nginx:
+  #   image: nginx:alpine
+  #   container_name: chatcal-nginx
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   volumes:
+  #     - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+  #     - ./docker/nginx/ssl:/etc/nginx/ssl:ro
+  #     - ./frontend/dist:/usr/share/nginx/html:ro
+  #   depends_on:
+  #     - api
+  #   restart: unless-stopped
+  #   networks:
+  #     - chatcal-network
 
 volumes:
   redis-data:

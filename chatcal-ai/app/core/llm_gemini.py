@@ -32,7 +32,7 @@ class GeminiLLM:
             else:
                 self.llm = Gemini(
                     api_key=self.api_key,
-                    model="gemini-2.0-flash-exp",  # Using Gemini 2.0 Flash Experimental
+                    model="models/gemini-2.0-flash-exp",  # Using Gemini 2.0 Flash Experimental with proper prefix
                     max_tokens=4096,
                     temperature=0.7,  # Balanced for friendly conversation
                     system_prompt=SYSTEM_PROMPT
@@ -62,15 +62,6 @@ class GeminiLLM:
             raise RuntimeError("Gemini LLM not initialized. Please check your configuration.")
         return self.llm
     
-    def test_connection(self) -> bool:
-        """Test the Gemini API connection."""
-        try:
-            response = self.llm.complete("Hello")
-            return bool(response.text)
-        except Exception as e:
-            print(f"❌ Gemini API test failed: {e}")
-            return False
-    
     def create_chat_message(self, content: str, role: MessageRole = MessageRole.USER) -> ChatMessage:
         """Create a chat message with the specified role."""
         return ChatMessage(role=role, content=content)
@@ -86,11 +77,9 @@ class GeminiLLM:
     def test_connection(self) -> bool:
         """Test the connection to Gemini API."""
         try:
-            test_message = [
-                ChatMessage(role=MessageRole.USER, content="Hello! Please respond with a brief greeting.")
-            ]
-            response = self.llm.chat(test_message)
-            return bool(response.message.content)
+            # Use complete() instead of chat() for testing to avoid the ChatResponse/CompletionResponse issue
+            response = self.llm.complete("Hello")
+            return bool(response and hasattr(response, 'text') and response.text)
         except Exception as e:
             print(f"Gemini API connection test failed: {e}")
             return False
