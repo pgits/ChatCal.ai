@@ -18,6 +18,14 @@ class ChatCalAgent:
         self.calendar_tools = CalendarTools()
         self.llm = gemini_llm.get_llm()
         
+        # User information storage
+        self.user_info = {
+            "name": None,
+            "email": None,
+            "phone": None,
+            "preferences": {}
+        }
+        
         # Set up memory
         self.memory = ChatMemoryBuffer(token_limit=3000)
         
@@ -30,8 +38,13 @@ class ChatCalAgent:
         # Get calendar tools
         tools = self.calendar_tools.get_tools()
         
+        # Get current user context
+        user_context = self._get_user_context()
+        
         # Enhanced system prompt for calendar agent
         enhanced_system_prompt = f"""{SYSTEM_PROMPT}
+
+{user_context}
 
 ## Calendar Assistant Capabilities
 
@@ -41,27 +54,48 @@ You have access to the following calendar management tools:
 3. **list_upcoming_events**: Show upcoming calendar events
 4. **reschedule_appointment**: Move existing appointments to new times
 
-## Conversation Guidelines
+## User Information Guidelines
 
-When users ask about scheduling:
-1. **Always be enthusiastic** and use encouraging language
-2. **Ask clarifying questions** if needed (duration, attendees, etc.)
-3. **Suggest optimal times** based on availability
-4. **Confirm details** before creating appointments
-5. **Celebrate successful bookings** with positive reinforcement
+- ALWAYS collect user information early: full name, email, phone number
+- Store and remember this information throughout the conversation
+- Use the user's name once you know it
+- When showing availability, present times in a clear, selectable format
+- Before booking, confirm all details including user contact information
+
+## Availability Requests Recognition
+
+Recognize these patterns as availability requests and ALWAYS use the check_availability tool:
+- "What times does Peter have free [date]?"
+- "What's Peter's availability for [date]?"
+- "Show me Peter's open slots [date]"
+- "When is Peter available [date]?"
+- "Check Peter's schedule for [date]"
+- "What times are available [date]?"
+
+## Example Availability Response
+
+When user asks "What times does Peter have free tomorrow?":
+1. Use check_availability tool with date="tomorrow"
+2. Format response like: "Here are Peter's available time slots for tomorrow:
+• 9:00 AM - 10:00 AM
+• 11:30 AM - 12:30 PM  
+• 2:00 PM - 3:00 PM
+• 4:00 PM - 5:00 PM
+
+Which time would work best for you, [user's name]?"
 
 ## Example Interactions
 
-User: "I need to schedule a meeting with John next week"
-You: "I'd be absolutely delighted to help you schedule that meeting with John! 🌟 What day next week works best for you? And how long should I book this for - 30 minutes, an hour?"
+User: "I need to schedule a meeting with Peter next week"
+You: "I'd be happy to help you schedule time with Peter! First, may I have your full name for the appointment?"
 
-User: "Check my availability for tomorrow"  
-You: "Let me check your calendar for tomorrow! ✨ [use check_availability tool] Great news! Here's what I found..."
+User: "What times does Peter have free tomorrow?"
+You: [Use check_availability tool] "Here are Peter's available times for tomorrow: [list times]"
 
-User: "Book me a 1-hour meeting with Sarah for Tuesday at 2pm"
-You: "Perfect! Let me get that scheduled for you right away! [use create_appointment tool] Fantastic! 🎉 Your meeting with Sarah is all set..."
+User: "My name is John Smith, email john@example.com"
+You: "Thank you, John! I have your information. Now, what type of meeting would you like to schedule with Peter?"
 
-Always maintain your friendly, jovial personality while being helpful and efficient!"""
+Always maintain your professional yet friendly personality while collecting complete user information!"""
 
         # Create agent
         agent = ReActAgent.from_tools(
@@ -74,6 +108,79 @@ Always maintain your friendly, jovial personality while being helpful and effici
         )
         
         return agent
+    
+    def _get_user_context(self) -> str:
+        """Generate user context for the system prompt."""
+        if not any(self.user_info.values()):
+            return "## Current User Information\nNo user information collected yet. Please collect name, email, and phone number."
+        
+        context = "## Current User Information\n"
+        if self.user_info["name"]:
+            context += f"- Name: {self.user_info['name']}\n"
+        if self.user_info["email"]:
+            context += f"- Email: {self.user_info['email']}\n"
+        if self.user_info["phone"]:
+            context += f"- Phone: {self.user_info['phone']}\n"
+            
+        missing = []
+        if not self.user_info["name"]:
+            missing.append("name")
+        if not self.user_info["email"]:
+            missing.append("email")
+        if not self.user_info["phone"]:
+            missing.append("phone")
+            
+        if missing:
+            context += f"- Still needed: {', '.join(missing)}\n"
+            
+        return context
+    
+    def update_user_info(self, info_type: str, value: str) -> bool:
+        """Update user information."""
+        if info_type in self.user_info:
+            self.user_info[info_type] = value
+            return True
+        return False
+    
+    def get_user_info(self) -> Dict:
+        """Get current user information."""
+        return self.user_info.copy()
+    
+    def extract_user_info_from_message(self, message: str) -> Dict:
+        """Extract user information from user messages using simple patterns."""
+        import re
+        extracted = {}
+        
+        # Email pattern
+        email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+        emails = re.findall(email_pattern, message)
+        if emails:
+            extracted['email'] = emails[0]
+        
+        # Phone pattern (basic - US format)
+        phone_pattern = r'(\+?1[-.\s]?)?\(?([0-9]{3})\)?[-.\s]?([0-9]{3})[-.\s]?([0-9]{4})'
+        phones = re.findall(phone_pattern, message)
+        if phones:
+            extracted['phone'] = ''.join(phones[0])
+        
+        # Name pattern (when someone says "My name is..." or "I'm...")
+        name_patterns = [
+            r"my name is ([A-Za-z\s]+)",
+            r"i'm ([A-Za-z\s]+)",
+            r"this is ([A-Za-z\s]+)",
+            r"i am ([A-Za-z\s]+)"
+        ]
+        
+        for pattern in name_patterns:
+            match = re.search(pattern, message.lower())
+            if match:
+                potential_name = match.group(1).strip().title()
+                # Simple validation - name should be 2-50 chars and not contain numbers
+                if 2 <= len(potential_name) <= 50 and not any(char.isdigit() for char in potential_name):
+                    extracted['name'] = potential_name
+                    break
+        
+        return extracted
     
     def start_conversation(self) -> str:
         """Start a new conversation with greeting."""
@@ -92,6 +199,12 @@ Always maintain your friendly, jovial personality while being helpful and effici
             
             if len(message) > 1000:
                 return "That's quite a message! Could you break it down into smaller parts? I work better with shorter requests. 📝"
+            
+            # Extract and store user information from the message
+            extracted_info = self.extract_user_info_from_message(message)
+            for info_type, value in extracted_info.items():
+                if not self.user_info.get(info_type):  # Only update if we don't already have this info
+                    self.update_user_info(info_type, value)
             
             # Start conversation if needed
             if not self.conversation_started:
@@ -136,6 +249,12 @@ Always maintain your friendly, jovial personality while being helpful and effici
                 for word in error_message.split():
                     yield word + " "
                 return
+            
+            # Extract and store user information from the message
+            extracted_info = self.extract_user_info_from_message(message)
+            for info_type, value in extracted_info.items():
+                if not self.user_info.get(info_type):  # Only update if we don't already have this info
+                    self.update_user_info(info_type, value)
             
             # Start conversation if needed
             if not self.conversation_started:
