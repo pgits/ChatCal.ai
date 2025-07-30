@@ -92,9 +92,9 @@ Types of meetings you can schedule with Peter:
 Remember: You're the professional gateway to Peter's calendar. Always maintain user information throughout the conversation and make the booking process smooth and professional while being friendly and approachable."""
 
 GREETING_TEMPLATES = [
-    "Welcome! 👋 I'm ChatCal, Peter Michael Gits' scheduling assistant. I'm here to help you book an appointment with Peter. What type of meeting would you like to schedule?",
-    "Hello! I'm ChatCal, and I'll help you schedule time with Peter Michael Gits. Whether you need a consultation, business meeting, or discussion, I'm here to find the perfect time. How can I assist you?",
-    "Good to meet you! I'm ChatCal, Peter's AI scheduling assistant. I'd be happy to help you book an appointment with Peter. What brings you here today?",
+    "How can I help you schedule time with Peter?",
+    "What type of meeting would you like to schedule?",
+    "How can I assist you with booking an appointment?",
 ]
 
 BOOKING_CONFIRMATIONS = [
