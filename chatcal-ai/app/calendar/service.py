@@ -138,7 +138,8 @@ class CalendarService:
         description: Optional[str] = None,
         attendees: Optional[List[str]] = None,
         location: Optional[str] = None,
-        send_notifications: bool = True
+        send_notifications: bool = True,
+        create_meet_conference: bool = False
     ) -> Dict:
         """Create a new calendar event."""
         service = self._get_service()
@@ -170,11 +171,27 @@ class CalendarService:
         if attendees:
             event['attendees'] = [{'email': email} for email in attendees]
         
+        # Add Google Meet conference if requested
+        if create_meet_conference:
+            import uuid
+            event['conferenceData'] = {
+                'createRequest': {
+                    'requestId': str(uuid.uuid4()),  # Generate unique request ID
+                    'conferenceSolutionKey': {
+                        'type': 'hangoutsMeet'
+                    }
+                }
+            }
+        
         try:
+            # Use conferenceDataVersion=1 if creating a Meet conference
+            conference_version = 1 if create_meet_conference else None
+            
             created_event = service.events().insert(
                 calendarId=self.calendar_id,
                 body=event,
-                sendNotifications=send_notifications
+                sendNotifications=send_notifications,
+                conferenceDataVersion=conference_version
             ).execute()
             
             return created_event

@@ -2,7 +2,6 @@ from typing import List, Dict, Optional
 from datetime import datetime
 from llama_index.core.llms import ChatMessage, MessageRole
 from llama_index.core.memory import ChatMemoryBuffer
-from app.core.llm_gemini import gemini_llm
 from app.core.agent import ChatCalAgent
 from app.personality.prompts import GREETING_TEMPLATES
 import random

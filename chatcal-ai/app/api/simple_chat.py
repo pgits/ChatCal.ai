@@ -111,11 +111,13 @@ async def simple_chat():
                 <br><br>
                 I can schedule:
                 <ul>
-                    <li>Business consultations (60 min)</li>
-                    <li>Quick discussions (30 min)</li>
-                    <li>Project meetings (60 min)</li>
-                    <li>Advisory sessions (90 min)</li>
+                    <li>Business consultations (60 min) - in-person or Google Meet</li>
+                    <li>Quick discussions (30 min) - in-person or Google Meet</li>
+                    <li>Project meetings (60 min) - in-person or Google Meet</li>
+                    <li>Advisory sessions (90 min) - in-person or Google Meet</li>
                 </ul>
+                <strong>🎥 Google Meet:</strong> Just mention "Google Meet", "video call", or "online meeting" and I'll automatically create a video conference link for you!
+                <br><br>
                 What type of meeting would you like to schedule?
             </div>
         </div>

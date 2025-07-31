@@ -37,6 +37,20 @@ class Settings(BaseSettings):
     max_conversation_history: int = Field(default=20, env="MAX_CONVERSATION_HISTORY")
     session_timeout_minutes: int = Field(default=30, env="SESSION_TIMEOUT_MINUTES")
     
+    # HuggingFace Settings
+    tokenizers_parallelism: Optional[str] = Field(default="false", env="TOKENIZERS_PARALLELISM")
+    
+    # Peter's Contact Information
+    my_phone_number: str = Field(..., env="MY_PHONE_NUMBER")
+    my_email_address: str = Field(..., env="MY_EMAIL_ADDRESS")
+    
+    # Email Service Configuration
+    smtp_server: str = Field(default="smtp.gmail.com", env="SMTP_SERVER")
+    smtp_port: int = Field(default=587, env="SMTP_PORT")
+    smtp_username: Optional[str] = Field(None, env="SMTP_USERNAME")
+    smtp_password: Optional[str] = Field(None, env="SMTP_PASSWORD")
+    email_from_name: str = Field(default="ChatCal.ai", env="EMAIL_FROM_NAME")
+    
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

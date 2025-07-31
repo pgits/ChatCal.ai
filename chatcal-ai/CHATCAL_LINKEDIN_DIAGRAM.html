@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChatCal.ai - AI-Powered Scheduling Assistant</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2c3e50, #3498db);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 40px;
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+
+        .feature-box {
+            background: #f8f9fa;
+            border-left: 5px solid #3498db;
+            border-radius: 10px;
+            padding: 25px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+            transition: transform 0.3s ease;
+        }
+
+        .feature-box:hover {
+            transform: translateY(-5px);
+        }
+
+        .feature-box h3 {
+            color: #2c3e50;
+            font-size: 1.3em;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+        }
+
+        .feature-box h3 .emoji {
+            font-size: 1.5em;
+            margin-right: 10px;
+        }
+
+        .feature-list {
+            list-style: none;
+        }
+
+        .feature-list li {
+            margin: 8px 0;
+            padding-left: 25px;
+            position: relative;
+        }
+
+        .feature-list li::before {
+            content: "✅";
+            position: absolute;
+            left: 0;
+        }
+
+        .setup-section {
+            background: #e8f5e9;
+            border-radius: 10px;
+            padding: 30px;
+            margin: 30px 0;
+        }
+
+        .setup-steps {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .step {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            border: 2px solid #4caf50;
+        }
+
+        .step h4 {
+            color: #2e7d32;
+            margin-bottom: 10px;
+        }
+
+        .example-box {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+            border-radius: 10px;
+            padding: 25px;
+            margin: 30px 0;
+        }
+
+        .conversation {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+            border-left: 4px solid #007bff;
+        }
+
+        .user-message {
+            background: #e3f2fd;
+            border-left-color: #2196f3;
+        }
+
+        .bot-message {
+            background: #e8f5e9;
+            border-left-color: #4caf50;
+        }
+
+        .tech-stack {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+
+        .tech-item {
+            background: #f1f8ff;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            border: 2px solid #e3f2fd;
+        }
+
+        .linkedin-captions {
+            background: #f0f2f5;
+            border-radius: 10px;
+            padding: 30px;
+            margin: 30px 0;
+        }
+
+        .caption-option {
+            background: white;
+            padding: 20px;
+            margin: 15px 0;
+            border-radius: 8px;
+            border-left: 4px solid #0077b5;
+        }
+
+        .benefits-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 25px;
+            margin: 30px 0;
+        }
+
+        .benefit-card {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 25px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .benefit-card h4 {
+            margin-bottom: 15px;
+            font-size: 1.2em;
+        }
+
+        .journey-timeline {
+            position: relative;
+            padding: 20px 0;
+        }
+
+        .timeline-item {
+            background: white;
+            border: 2px solid #3498db;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            position: relative;
+        }
+
+        .timeline-item::before {
+            content: "📅";
+            position: absolute;
+            left: -15px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: white;
+            padding: 5px;
+            border-radius: 50%;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2em;
+            }
+            
+            .feature-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .setup-steps {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .highlight {
+            background: linear-gradient(120deg, #84fab0 0%, #8fd3f4 100%);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+
+        .code {
+            background: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            border: 1px solid #ddd;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🤖 ChatCal.ai</h1>
+            <p>AI-Powered Scheduling Assistant for Peter Michael Gits</p>
+        </div>
+
+        <div class="content">
+            <h2 style="text-align: center; margin-bottom: 40px; color: #2c3e50;">Complete Feature Overview & Technical Documentation</h2>
+
+            <div class="feature-grid">
+                <div class="feature-box">
+                    <h3><span class="emoji">🎯</span> Core Features</h3>
+                    <ul class="feature-list">
+                        <li><strong>Natural Language Processing</strong><br>"Book 15 mins with Peter"</li>
+                        <li><strong>Smart Contact Collection</strong><br>Name + Email OR Phone required</li>
+                        <li><strong>Intelligent Time Management</strong><br>Real-time availability & conflict detection</li>
+                        <li><strong>Multi-Format Meeting Support</strong><br>30-90 minute sessions</li>
+                    </ul>
+                </div>
+
+                <div class="feature-box">
+                    <h3><span class="emoji">🎥</span> Google Meet Integration</h3>
+                    <ul class="feature-list">
+                        <li><strong>Automatic Video Conference Creation</strong><br>Detects keywords automatically</li>
+                        <li><strong>Real Google Meet Links</strong><br>Generated via Calendar API</li>
+                        <li><strong>Smart Detection</strong><br>"Google Meet", "video call", "online meeting"</li>
+                        <li><strong>Universal Compatibility</strong><br>Works with all meeting types</li>
+                    </ul>
+                </div>
+
+                <div class="feature-box">
+                    <h3><span class="emoji">📧</span> Email System</h3>
+                    <ul class="feature-list">
+                        <li><strong>Dual Email Invitations</strong><br>Sent to both Peter & user</li>
+                        <li><strong>Rich Calendar Attachments</strong><br>.ics files with Meet links</li>
+                        <li><strong>Smart Email Collection</strong><br>Optional but encouraged</li>
+                        <li><strong>Professional Templates</strong><br>Branded communication</li>
+                    </ul>
+                </div>
+
+                <div class="feature-box">
+                    <h3><span class="emoji">🧠</span> AI Capabilities</h3>
+                    <ul class="feature-list">
+                        <li><strong>Claude Sonnet 4 Integration</strong><br>Latest Anthropic AI model</li>
+                        <li><strong>Context-Aware Conversations</strong><br>Remembers user details</li>
+                        <li><strong>Information Extraction</strong><br>Complex multi-part requests</li>
+                        <li><strong>Intelligent Error Handling</strong><br>Graceful conflict resolution</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="setup-section">
+                <h3 style="color: #2e7d32; margin-bottom: 20px;">📋 Setup Guide</h3>
+                <div class="setup-steps">
+                    <div class="step">
+                        <h4>1️⃣ Prerequisites</h4>
+                        <ul>
+                            <li>Python 3.9+</li>
+                            <li>Google Cloud Project</li>
+                            <li>Anthropic API key</li>
+                        </ul>
+                    </div>
+                    <div class="step">
+                        <h4>2️⃣ Google Calendar Setup</h4>
+                        <ul>
+                            <li>Enable Google Calendar API</li>
+                            <li>Create OAuth2 credentials</li>
+                            <li>Run: <span class="code">python3 complete_oauth.py</span></li>
+                        </ul>
+                    </div>
+                    <div class="step">
+                        <h4>3️⃣ Environment Configuration</h4>
+                        <ul>
+                            <li>Copy .env.example to .env</li>
+                            <li>Add ANTHROPIC_API_KEY</li>
+                            <li>Add Google Calendar ID</li>
+                            <li>Add contact information</li>
+                        </ul>
+                    </div>
+                    <div class="step">
+                        <h4>4️⃣ Dependencies & Launch</h4>
+                        <ul>
+                            <li><span class="code">pip install -r requirements.txt</span></li>
+                            <li><span class="code">uvicorn app.api.main:app --reload</span></li>
+                            <li>Visit: <span class="code">localhost:8000/simple-chat</span></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="example-box">
+                <h3 style="color: #856404; margin-bottom: 20px;">💡 Usage Examples</h3>
+                
+                <div class="conversation user-message">
+                    <strong>🗣️ User:</strong> "Book 15 minutes with Peter, this is Betty, have him call me at 630 880 5488 Friday, please show me available morning times"
+                </div>
+                
+                <div class="conversation bot-message">
+                    <strong>🤖 ChatCal:</strong> ✅ Name: Betty ✅ Phone: 630-880-5488<br>
+                    "Here are Friday morning slots: 9:00 AM, 10:30 AM, 11:00 AM"
+                </div>
+
+                <div class="conversation user-message">
+                    <strong>🗣️ User:</strong> "I need a Google Meet with Peter Wednesday at 2pm for an hour"
+                </div>
+                
+                <div class="conversation bot-message">
+                    <strong>🤖 ChatCal:</strong> ✅ Meeting booked ✅ Google Meet: <span class="highlight">meet.google.com/xyz-abc-123</span><br>
+                    📧 Email invitations sent to both parties
+                </div>
+            </div>
+
+            <h3 style="color: #2c3e50; margin-bottom: 20px;">🔧 Technical Architecture</h3>
+            <div class="tech-stack">
+                <div class="tech-item">
+                    <h4>Backend</h4>
+                    <ul style="text-align: left;">
+                        <li>FastAPI REST API</li>
+                        <li>Redis session management</li>
+                        <li>Google Calendar API</li>
+                        <li>SMTP email service</li>
+                    </ul>
+                </div>
+                <div class="tech-item">
+                    <h4>Frontend</h4>
+                    <ul style="text-align: left;">
+                        <li>HTML/JS chat interface</li>
+                        <li>Real-time messaging</li>
+                        <li>Mobile-responsive design</li>
+                        <li>Clean, professional UI</li>
+                    </ul>
+                </div>
+                <div class="tech-item">
+                    <h4>AI & Integration</h4>
+                    <ul style="text-align: left;">
+                        <li>LlamaIndex ReActAgent</li>
+                        <li>Anthropic Claude Sonnet 4</li>
+                        <li>Google OAuth2 authentication</li>
+                        <li>Advanced prompt engineering</li>
+                    </ul>
+                </div>
+                <div class="tech-item">
+                    <h4>Deployment</h4>
+                    <ul style="text-align: left;">
+                        <li>Docker containerization</li>
+                        <li>Environment-based config</li>
+                        <li>Production-ready setup</li>
+                        <li>Scalable architecture</li>
+                    </ul>
+                </div>
+            </div>
+
+            <h3 style="color: #2c3e50; margin-bottom: 20px;">🚀 Development Journey</h3>
+            <div class="journey-timeline">
+                <div class="timeline-item">
+                    <h4 style="color: #3498db;">Phase 1: Core Scheduling (anthropic-sonnet branch)</h4>
+                    <ul>
+                        <li>Replaced Gemini with Claude Sonnet 4</li>
+                        <li>Built intelligent contact collection</li>
+                        <li>Added email invitation system</li>
+                    </ul>
+                </div>
+                <div class="timeline-item">
+                    <h4 style="color: #3498db;">Phase 2: Google Meet Integration (google-meet branch)</h4>
+                    <ul>
+                        <li>Added video conference detection</li>
+                        <li>Integrated Google Calendar conferenceData API</li>
+                        <li>Enhanced email templates with Meet links</li>
+                    </ul>
+                </div>
+            </div>
+
+            <h3 style="color: #2c3e50; margin-bottom: 20px;">🎯 Key Benefits</h3>
+            <div class="benefits-grid">
+                <div class="benefit-card">
+                    <h4>For Users</h4>
+                    <ul style="text-align: left;">
+                        <li>Natural conversation scheduling</li>
+                        <li>No complex forms</li>
+                        <li>Automatic calendar integration</li>
+                        <li>Google Meet links on demand</li>
+                    </ul>
+                </div>
+                <div class="benefit-card">
+                    <h4>For Business</h4>
+                    <ul style="text-align: left;">
+                        <li>24/7 availability</li>
+                        <li>Professional brand presence</li>
+                        <li>Reduced scheduling overhead</li>
+                        <li>Enhanced client experience</li>
+                    </ul>
+                </div>
+                <div class="benefit-card">
+                    <h4>For Developers</h4>
+                    <ul style="text-align: left;">
+                        <li>Modern Python/FastAPI stack</li>
+                        <li>Clean, extensible architecture</li>
+                        <li>Production-ready deployment</li>
+                        <li>Comprehensive documentation</li>
+                    </ul>
+                </div>
+                <div class="benefit-card">
+                    <h4>For AI Enthusiasts</h4>
+                    <ul style="text-align: left;">
+                        <li>Claude Sonnet 4 integration</li>
+                        <li>Real-world AI application</li>
+                        <li>Advanced prompt engineering</li>
+                        <li>Natural language processing</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="linkedin-captions">
+                <h3 style="color: #2c3e50; margin-bottom: 20px;">LinkedIn Post Caption Ideas</h3>
+                
+                <div class="caption-option">
+                    <h4>Option 1 - Technical Focus:</h4>
+                    <p>"🚀 Just completed ChatCal.ai - an AI-powered scheduling assistant that transforms how we book meetings! Built with Claude Sonnet 4, it handles natural language requests, creates Google Meet links automatically, and sends professional email invitations. The AI extracts contact info from conversations like 'This is Betty, call me at 630-880-5488' and books meetings intelligently. #AI #Python #GoogleMeet #Automation"</p>
+                </div>
+                
+                <div class="caption-option">
+                    <h4>Option 2 - Business Value:</h4>
+                    <p>"💡 Solving the scheduling headache with AI! ChatCal.ai lets clients book time using natural conversation - no forms, no back-and-forth emails. Just say 'Book a Google Meet with Peter tomorrow at 2pm' and it handles everything: calendar conflicts, Google Meet links, email invitations. The future of client onboarding! #ClientExperience #AI #BusinessAutomation"</p>
+                </div>
+                
+                <div class="caption-option">
+                    <h4>Option 3 - Developer Journey:</h4>
+                    <p>"🔧 From idea to production: Building ChatCal.ai taught me advanced Google Calendar API integration, AI prompt engineering with Claude Sonnet 4, and creating seamless user experiences. The system now handles complex requests like 'Book 15 minutes Friday morning' and creates real Google Meet conferences automatically. Open to discussing the technical architecture! #SoftwareDevelopment #AI #GoogleAPI"</p>
+                </div>
+            </div>
+
+            <div style="text-align: center; margin-top: 40px; padding: 30px; background: linear-gradient(135deg, #667eea, #764ba2); color: white; border-radius: 10px;">
+                <h3>Built with ❤️ using Claude Sonnet 4, Google Calendar API, and modern Python</h3>
+                <p style="margin-top: 15px; opacity: 0.9;">A complete AI-powered scheduling solution from concept to production</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

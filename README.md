@@ -1,189 +1,146 @@
-# ChatCal.ai - Friendly Google Calendar Booking Assistant
+# ChatCal.ai
 
-A jovial and encouraging AI chatbot powered by Anthropic's Claude and LlamaIndex that helps users book appointments on Google Calendar with a delightful conversational experience.
+An AI-powered Google Calendar booking assistant with multiple LLM integrations and local model support.
 
-## Features
+## Overview
 
-- 🤖 Powered by Anthropic's Claude for natural conversations
-- 📅 Seamless Google Calendar integration
-- 🌟 Friendly, encouraging personality that makes scheduling fun
-- 🐳 Fully containerized with Docker for easy deployment
-- 🚀 FastAPI backend with Redis session management
-- 🔒 Secure OAuth2 authentication for Google Calendar
-- 🌍 Timezone-aware scheduling
-- 💬 Context-aware multi-turn conversations
-
-## Prerequisites
-
-- Python 3.11+
-- Docker and Docker Compose
-- Anthropic API key (unlimited account)
-- Google Cloud Project with Calendar API enabled
-- Google OAuth2 credentials
-
-## Quick Start
-
-### 1. Clone the repository
-```bash
-git clone <repository>
-cd chatcal-ai
-```
-
-### 2. Set up environment variables
-```bash
-cp .env.example .env
-```
-
-Edit `.env` with your credentials:
-- `ANTHROPIC_API_KEY`: Your Anthropic API key
-- `GOOGLE_CLIENT_ID` & `GOOGLE_CLIENT_SECRET`: From Google Cloud Console
-- `SECRET_KEY`: Generate a secure secret key
-
-### 3. Google Calendar Setup
-
-1. Go to [Google Cloud Console](https://console.cloud.google.com)
-2. Create a new project or select existing
-3. Enable Google Calendar API:
-   - Navigate to "APIs & Services" > "Library"
-   - Search for "Google Calendar API"
-   - Click "Enable"
-4. Create OAuth2 credentials:
-   - Go to "APIs & Services" > "Credentials"
-   - Click "Create Credentials" > "OAuth client ID"
-   - Choose "Web application"
-   - Add authorized redirect URIs:
-     - `http://localhost:8000/auth/callback`
-     - `https://yourdomain.com/auth/callback` (for production)
-   - Save and download the credentials
-
-### 4. Run with Docker
-
-```bash
-# Build and start all services
-docker-compose up -d
-
-# View logs
-docker-compose logs -f
-
-# Stop services
-docker-compose down
-```
-
-The application will be available at:
-- API: http://localhost:8000
-- API Docs: http://localhost:8000/docs
-
-### 5. Development Setup (without Docker)
-
-```bash
-# Install Poetry
-pip install poetry
-
-# Install dependencies
-poetry install
-
-# Activate virtual environment
-poetry shell
-
-# Run the application
-uvicorn app.api.main:app --reload
-```
+ChatCal.ai is a comprehensive calendar booking solution that combines the power of large language models with Google Calendar integration. The project includes both cloud-based LLM options (Anthropic Claude, Google Gemini) and local model support through Hugging Face transformers.
 
 ## Project Structure
 
 ```
-chatcal-ai/
-├── app/
-│   ├── core/           # LlamaIndex agent & Anthropic setup
-│   ├── calendar/       # Google Calendar integration
-│   ├── api/           # FastAPI endpoints
-│   └── personality/   # Chatbot personality prompts
-├── frontend/          # Web UI (React/Streamlit)
-├── docker/           # Docker configurations
-├── tests/           # Test suite
-├── credentials/     # Google credentials (gitignored)
-└── docker-compose.yml
+chatcal.ai/
+├── chatcal-ai/           # Main application
+│   ├── app/              # FastAPI backend
+│   ├── frontend/         # Web UI
+│   ├── docker/           # Containerization
+│   └── docs/             # Documentation
+├── hf-lama.py           # Local LLM with Hugging Face & LlamaIndex
+├── llama-anthropic.py   # Anthropic Claude integration
+├── models/              # Downloaded Hugging Face models
+└── docs/                # Project documentation
 ```
 
-## API Endpoints
+## Components
 
-- `POST /chat` - Send a message to the chatbot
-- `GET /health` - Health check endpoint
-- `GET /auth/login` - Initiate Google OAuth flow
-- `GET /auth/callback` - OAuth callback handler
-- `GET /sessions/{session_id}` - Get conversation history
+### 1. ChatCal.ai Core Application
+- **Location**: `./chatcal-ai/`
+- **Description**: Full-featured calendar booking assistant with web interface
+- **Features**: 
+  - Google Calendar integration
+  - FastAPI backend with Redis sessions
+  - Docker containerization
+  - OAuth2 authentication
+  - Multiple LLM provider support
 
-## Deployment
+### 2. Local LLM Integration (hf-lama.py)
+- **Purpose**: Run language models locally using Hugging Face transformers
+- **Features**:
+  - Support for Qwen2.5, Phi-3, and other open models
+  - LlamaIndex integration for RAG capabilities
+  - Document loading and vector indexing
+  - Interactive chat interface
+  - SSL certificate handling for NLTK downloads
 
-### Deploy to any platform with Docker:
+### 3. Cloud LLM Scripts
+- **llama-anthropic.py**: Integration with Anthropic's Claude API
+- **simpletest.py**: Testing utilities
 
-1. Build the production image:
+## Quick Start
+
+### Option 1: Full Application (Recommended)
 ```bash
-docker build -t chatcal-ai:latest .
+cd chatcal-ai
+docker-compose up -d
 ```
+Access at: http://localhost:8000
 
-2. Push to your container registry:
+### Option 2: Local LLM Only
 ```bash
-docker tag chatcal-ai:latest your-registry/chatcal-ai:latest
-docker push your-registry/chatcal-ai:latest
+python3 hf-lama.py
 ```
 
-3. Deploy using your platform's container service (ECS, GKE, Azure Container Instances, etc.)
+## Requirements
 
-### Embed in landing pages:
+### For Full Application:
+- Docker & Docker Compose
+- Google Cloud Project with Calendar API
+- Anthropic API key (optional)
+- Google Gemini API key (optional)
 
-Add the chat widget to any webpage:
-```html
-<iframe 
-  src="https://your-deployment.com/chat-widget" 
-  width="400" 
-  height="600"
-  frameborder="0">
-</iframe>
-```
+### For Local LLM:
+- Python 3.11+
+- PyTorch
+- Transformers
+- LlamaIndex
+- ~8GB+ RAM (for 7B models)
 
 ## Configuration
 
-See `app/config.py` for all available settings. Key configurations:
+1. **Google Calendar Setup**: Follow the guide in `chatcal-ai/docs/google-oauth-setup.md`
+2. **API Keys**: Set environment variables for your chosen LLM providers
+3. **Model Selection**: Edit `hf-lama.py` to choose your preferred local model
 
-- `MAX_CONVERSATION_HISTORY`: Number of messages to maintain in context
-- `SESSION_TIMEOUT_MINUTES`: Session expiration time
-- `DEFAULT_TIMEZONE`: Default timezone for appointments
+## Available Models (Local)
 
-## Testing
+- **Qwen2.5-7B-Instruct**: High-quality general purpose model
+- **Qwen2.5-3B-Instruct**: Lighter version for resource-constrained environments  
+- **Qwen2.5-1.5B-Instruct**: Ultra-lightweight option
+- **Phi-3-mini-128k**: Microsoft's efficient model with large context
 
+## Features
+
+### Cloud Integration
+- ✅ Anthropic Claude (Sonnet, Haiku)
+- ✅ Google Gemini Pro
+- ✅ Google Calendar API
+- ✅ OAuth2 authentication
+- ✅ Session management
+
+### Local Capabilities
+- ✅ Local model inference
+- ✅ Document RAG with LlamaIndex
+- ✅ Vector embeddings
+- ✅ Interactive chat
+- ✅ SSL/NLTK handling
+
+### Deployment
+- ✅ Docker containerization
+- ✅ Docker Compose orchestration
+- ✅ Development & production configs
+- ✅ Health checks & monitoring
+
+## Documentation
+
+- [Main Application README](./chatcal-ai/README.md) - Detailed setup instructions
+- [Google OAuth Setup](./chatcal-ai/docs/google-oauth-setup.md) - Calendar integration guide
+- [LinkedIn Integration](./chatcal-ai/docs/linkedin-google-calendar-integration.md) - Business use cases
+- [Deployment Guide](./chatcal-ai/DEPLOYMENT.md) - Production deployment
+
+## Development
+
+### Testing Local Models
 ```bash
-# Run tests
-poetry run pytest
+# Test different model sizes
+python3 hf-lama.py  # Uses Qwen2.5-7B by default
 
-# Run with coverage
-poetry run pytest --cov=app
-
-# Run linting
-poetry run black .
-poetry run flake8
+# Edit the script to try other models:
+# config = model_configs["qwen2.5-3b"]  # Lighter option
+# config = model_configs["phi3-mini"]   # Microsoft model
 ```
 
-## Security Considerations
-
-- Always use HTTPS in production
-- Keep your API keys secure and never commit them
-- Implement rate limiting for production deployments
-- Use environment-specific configurations
-- Regular security audits of dependencies
-
-## Contributing
-
+### Contributing
 1. Fork the repository
 2. Create a feature branch
-3. Make your changes
-4. Run tests and linting
-5. Submit a pull request
-
-## License
-
-[Your chosen license]
+3. Test your changes with both local and cloud models
+4. Submit a pull request
 
 ## Support
 
-For issues or questions, please open an issue on GitHub or contact pgits.job@gmail.com
+- **Issues**: Open GitHub issues for bugs or feature requests
+- **Documentation**: Check the `docs/` directories for detailed guides
+- **Contact**: pgits.job@gmail.com
+
+## License
+
+See individual component licenses in their respective directories.

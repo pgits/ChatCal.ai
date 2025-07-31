@@ -6,16 +6,19 @@ from llama_index.core.tools import FunctionTool
 from app.calendar.service import CalendarService
 from app.calendar.utils import DateTimeParser, CalendarFormatter
 from app.personality.prompts import BOOKING_CONFIRMATIONS, ERROR_RESPONSES
+from app.core.email_service import email_service
+from app.config import settings
 import random
 
 
 class CalendarTools:
     """LlamaIndex tools for calendar operations."""
     
-    def __init__(self):
+    def __init__(self, agent=None):
         self.calendar_service = CalendarService()
         self.datetime_parser = DateTimeParser()
         self.formatter = CalendarFormatter()
+        self.agent = agent  # Reference to the ChatCalAgent for user info
     
     def check_availability(
         self,
@@ -76,10 +79,14 @@ class CalendarTools:
         time_string: str,
         duration_minutes: int = 60,
         description: Optional[str] = None,
-        attendee_emails: Optional[List[str]] = None
+        attendee_emails: Optional[List[str]] = None,
+        user_name: str = None,
+        user_phone: str = None,
+        user_email: str = None,
+        create_meet_conference: bool = False
     ) -> str:
         """
-        Create a new calendar appointment.
+        Create a new calendar appointment with email invitations.
         
         Args:
             title: Meeting title/summary
@@ -88,6 +95,10 @@ class CalendarTools:
             duration_minutes: Duration in minutes
             description: Optional meeting description
             attendee_emails: Optional list of attendee email addresses
+            user_name: User's full name
+            user_phone: User's phone number
+            user_email: User's email address
+            create_meet_conference: Whether to create a Google Meet conference
         
         Returns:
             Confirmation message or error
@@ -114,23 +125,90 @@ class CalendarTools:
                 start_time=start_time,
                 end_time=end_time,
                 description=description,
-                attendees=attendee_emails or []
+                attendees=attendee_emails or [],
+                create_meet_conference=create_meet_conference
             )
             
             # Format confirmation
             formatted_time = self.formatter.format_datetime(start_time)
             duration_str = self.formatter.format_duration(duration_minutes)
             
+            # Extract Google Meet link if conference was created
+            meet_link = ""
+            if create_meet_conference and 'conferenceData' in event and 'entryPoints' in event['conferenceData']:
+                meet_entries = event['conferenceData']['entryPoints']
+                meet_link = next((entry['uri'] for entry in meet_entries if entry['entryPointType'] == 'video'), "")
+            
+            # Send email invitations
+            email_sent_to_user = False
+            email_sent_to_peter = False
+            
+            # Send email to Peter (always)
+            try:
+                email_sent_to_peter = email_service.send_invitation_email(
+                    to_email=settings.my_email_address,
+                    to_name="Peter Michael Gits",
+                    title=title,
+                    start_datetime=start_time,
+                    end_datetime=end_time,
+                    description=description or "",
+                    user_phone=user_phone or "",
+                    meeting_type=title,
+                    meet_link=meet_link
+                )
+            except Exception as e:
+                print(f"Failed to send email to Peter: {e}")
+            
+            # Send email to user if they provided email
+            if user_email:
+                try:
+                    email_sent_to_user = email_service.send_invitation_email(
+                        to_email=user_email,
+                        to_name=user_name or "Guest",
+                        title=title,
+                        start_datetime=start_time,
+                        end_datetime=end_time,
+                        description=description or "",
+                        user_phone=user_phone or "",
+                        meeting_type=title,
+                        meet_link=meet_link
+                    )
+                except Exception as e:
+                    print(f"Failed to send email to user: {e}")
+            
             # Use random confirmation message
             confirmation_template = random.choice(BOOKING_CONFIRMATIONS)
             confirmation = confirmation_template.format(
                 meeting_type=title,
-                attendee=attendee_emails[0] if attendee_emails else "your meeting",
+                attendee=user_name or "your meeting",
                 date=formatted_time.split(" at ")[0],
                 time=formatted_time.split(" at ")[1]
             )
             
-            return f"{confirmation} The meeting is set for {duration_str}."
+            # Add email status to confirmation
+            email_status = ""
+            if user_email and email_sent_to_user:
+                email_status = "\n\n📧 Calendar invitations have been sent to both you and Peter via email."
+            elif user_email and not email_sent_to_user:
+                email_status = "\n\n📧 Email invitation sent to Peter. There was an issue sending your invitation, but the meeting is confirmed."
+            elif not user_email:
+                email_status = "\n\n📧 If you'd like me to send you a calendar invitation via email, please provide your email address."
+            
+            # Add Google Meet information if conference was created
+            meet_info = ""
+            if create_meet_conference:
+                # Extract Meet link from the created event
+                if 'conferenceData' in event and 'entryPoints' in event['conferenceData']:
+                    meet_entries = event['conferenceData']['entryPoints']
+                    meet_link = next((entry['uri'] for entry in meet_entries if entry['entryPointType'] == 'video'), None)
+                    if meet_link:
+                        meet_info = f"\n\n🎥 Google Meet link: {meet_link}"
+                    else:
+                        meet_info = "\n\n🎥 Google Meet conference call has been set up (link will be available in your calendar)."
+                else:
+                    meet_info = "\n\n🎥 Google Meet conference call has been set up (link will be available in your calendar)."
+            
+            return f"{confirmation} The meeting is set for {duration_str}.{email_status}{meet_info}"
             
         except Exception as e:
             return f"I'm having trouble creating that appointment right now. Could you try again? (Error: {str(e)})"
@@ -263,6 +341,61 @@ class CalendarTools:
         except Exception as e:
             return f"I'm having trouble rescheduling that appointment. Could you try again? (Error: {str(e)})"
 
+    def create_appointment_with_user_info(
+        self,
+        title: str,
+        date_string: str,
+        time_string: str,
+        duration_minutes: int = 60,
+        description: Optional[str] = None
+    ) -> str:
+        """Create appointment using stored user information from agent."""
+        if not self.agent:
+            return "Internal error: No agent reference available."
+        
+        user_info = self.agent.get_user_info()
+        
+        # Check if we have required user information
+        if not self.agent.has_complete_user_info():
+            missing = self.agent.get_missing_user_info()
+            if "contact (email OR phone)" in missing:
+                return f"I cannot book any appointments without your contact information. I need either your email address or phone number. Which would you prefer to share? Alternatively, you can call Peter directly at {settings.my_phone_number}."
+            if "name" in missing:
+                return "I cannot book any appointment without your name. May I have your name?"
+        
+        # Detect if user requests Google Meet conference
+        create_meet = False
+        meet_keywords = ['google meet', 'meet', 'video call', 'video conference', 'online meeting', 'virtual meeting', 'conference call', 'zoom', 'online', 'remote']
+        
+        # Check title and description for meet keywords
+        text_to_check = f"{title} {description or ''}".lower()
+        create_meet = any(keyword in text_to_check for keyword in meet_keywords)
+        
+        # Also check recent conversation history for meet requests
+        if not create_meet and self.agent:
+            try:
+                recent_messages = self.agent.get_conversation_history()
+                if recent_messages:
+                    # Check last few messages for meet-related keywords
+                    recent_text = ' '.join([msg.get('content', '') for msg in recent_messages[-3:] if msg.get('content')])
+                    create_meet = any(keyword in recent_text.lower() for keyword in meet_keywords)
+            except:
+                pass  # If history access fails, continue without it
+        
+        # Create appointment with user information
+        return self.create_appointment(
+            title=title,
+            date_string=date_string,
+            time_string=time_string,
+            duration_minutes=duration_minutes,
+            description=description,
+            attendee_emails=[user_info.get('email')] if user_info.get('email') else None,
+            user_name=user_info.get('name'),
+            user_phone=user_info.get('phone'),
+            user_email=user_info.get('email'),
+            create_meet_conference=create_meet
+        )
+
     def get_tools(self) -> List[FunctionTool]:
         """Get list of LlamaIndex FunctionTool objects."""
         return [
@@ -272,9 +405,9 @@ class CalendarTools:
                 description="Check calendar availability for a specific date and time duration. Use this when users ask about free time slots."
             ),
             FunctionTool.from_defaults(
-                fn=self.create_appointment,
+                fn=self.create_appointment_with_user_info,
                 name="create_appointment", 
-                description="Create a new calendar appointment. Use this when users want to schedule or book a meeting."
+                description="Create a new calendar appointment with user information. ONLY use this after collecting user's name AND contact info (email OR phone). This tool will automatically validate required information and send email invitations."
             ),
             FunctionTool.from_defaults(
                 fn=self.list_upcoming_events,
