@@ -1,28 +1,28 @@
-"""Anthropic LLM integration for ChatCal.ai."""
+"""Groq LLM integration for ChatCal.ai (using anthropic_llm interface)."""
 
 from typing import Optional
 import os
 from llama_index.core import Settings
-from llama_index.llms.anthropic import Anthropic
+from llama_index.llms.groq import Groq
 from llama_index.core.llms import ChatMessage, MessageRole
 from app.config import settings
 from app.personality.prompts import SYSTEM_PROMPT
 
 
 class AnthropicLLM:
-    """Manages the Anthropic LLM integration with LlamaIndex."""
+    """Manages the Groq LLM integration with LlamaIndex (keeping AnthropicLLM name for compatibility)."""
     
     def __init__(self):
-        self.api_key = settings.anthropic_api_key
+        self.api_key = settings.groq_api_key  # Use GROQ_API_KEY instead
         self.llm = None
         self._initialize_llm()
     
     def _initialize_llm(self):
-        """Initialize the Anthropic LLM with LlamaIndex settings."""
+        """Initialize the Groq LLM with LlamaIndex settings."""
         try:
             # Validate API key
-            if not self.api_key or self.api_key == "your_anthropic_api_key_here":
-                raise ValueError("Anthropic API key not configured. Please set ANTHROPIC_API_KEY in .env file")
+            if not self.api_key or self.api_key == "your_groq_api_key_here":
+                raise ValueError("Groq API key not configured. Please set GROQ_API_KEY in .env file")
             
             # Check if we should use mock LLM for testing
             if os.getenv("USE_MOCK_LLM", "").lower() == "true":
@@ -30,14 +30,14 @@ class AnthropicLLM:
                 self.llm = MockAnthropicLLM(system_prompt=SYSTEM_PROMPT)
                 print("🔧 Using Mock LLM for testing")
             else:
-                self.llm = Anthropic(
+                self.llm = Groq(
                     api_key=self.api_key,
-                    model="claude-sonnet-4-20250514",  # Using Claude Sonnet 4
+                    model="llama-3.1-8b-instant",  # Using Groq's Llama 3.1 8B Instant
                     max_tokens=4096,
                     temperature=0.7,  # Balanced for friendly conversation
                     system_prompt=SYSTEM_PROMPT
                 )
-                print("🔧 Using Anthropic Claude Sonnet 4 LLM")
+                print("🔧 Using Groq Llama-3.1-8b-instant LLM")
             
             # Set as default LLM for LlamaIndex
             Settings.llm = self.llm
@@ -47,19 +47,19 @@ class AnthropicLLM:
             Settings.chunk_overlap = 20
             
         except Exception as e:
-            print(f"❌ Failed to initialize Anthropic LLM: {e}")
+            print(f"❌ Failed to initialize Groq LLM: {e}")
             # Fallback to mock LLM if available
             try:
                 from app.core.mock_llm import MockAnthropicLLM
                 self.llm = MockAnthropicLLM(system_prompt=SYSTEM_PROMPT)
                 print("🔧 Falling back to Mock LLM")
             except ImportError:
-                raise RuntimeError(f"Failed to initialize Anthropic LLM and no fallback available: {e}")
+                raise RuntimeError(f"Failed to initialize Groq LLM and no fallback available: {e}")
     
     def get_llm(self):
-        """Get the configured Anthropic LLM instance."""
+        """Get the configured Groq LLM instance."""
         if self.llm is None:
-            raise RuntimeError("Anthropic LLM not initialized. Please check your configuration.")
+            raise RuntimeError("Groq LLM not initialized. Please check your configuration.")
         return self.llm
     
     def create_chat_message(self, content: str, role: MessageRole = MessageRole.USER) -> ChatMessage:
@@ -75,13 +75,13 @@ class AnthropicLLM:
         return self.llm.chat(messages)
     
     def test_connection(self) -> bool:
-        """Test the connection to Anthropic API."""
+        """Test the connection to Groq API."""
         try:
             # Use complete() instead of chat() for testing to avoid response format issues
             response = self.llm.complete("Hello")
             return bool(response and hasattr(response, 'text') and response.text)
         except Exception as e:
-            print(f"Anthropic API connection test failed: {e}")
+            print(f"Groq API connection test failed: {e}")
             return False
 
 

@@ -272,13 +272,16 @@ async def chat_widget(request: Request):
             
             <div class="chat-messages" id="chatMessages">
                 <div class="welcome-message">
-                    👋 Welcome! I'm ChatCal, your friendly calendar assistant.<br>
-                    Try saying: "Schedule a meeting next Tuesday at 2pm" or "Check my availability tomorrow"
+                    👋 Welcome! I'm ChatCal, Peter Michael Gits' scheduling assistant.<br>
+                    I can schedule business consultations, project meetings, and advisory sessions.<br>
+                    <strong>🎥 Available formats:</strong> In-person meetings or Google Meet video calls<br>
+                    <em>Just mention "Google Meet", "video call", or "online meeting" for virtual appointments!</em>
                 </div>
                 
                 <div class="quick-actions">
-                    <button class="quick-action" onclick="sendQuickMessage('Check my availability for tomorrow')">📅 Check availability</button>
-                    <button class="quick-action" onclick="sendQuickMessage('What meetings do I have this week?')">📋 View schedule</button>
+                    <button class="quick-action" onclick="sendQuickMessage('Schedule a Google Meet with Peter')">🎥 Google Meet</button>
+                    <button class="quick-action" onclick="sendQuickMessage('Check Peter\\'s availability tomorrow')">📅 Check availability</button>
+                    <button class="quick-action" onclick="sendQuickMessage('Schedule an in-person meeting')">🤝 In-person meeting</button>
                     <button class="quick-action" onclick="sendQuickMessage('/help')">❓ Help</button>
                 </div>
             </div>
@@ -323,7 +326,7 @@ async def chat_widget(request: Request):
                         headers: {{
                             'Content-Type': 'application/json',
                         }},
-                        body: JSON.stringify({{}})
+                        body: JSON.stringify({{user_data: {{}}}})
                     }});
                     
                     if (response.ok) {{
@@ -346,7 +349,12 @@ async def chat_widget(request: Request):
                 
                 const messageContent = document.createElement('div');
                 messageContent.className = 'message-content';
-                messageContent.textContent = content;
+                // For assistant messages, render HTML; for user messages, use text only
+                if (isUser) {{
+                    messageContent.textContent = content;
+                }} else {{
+                    messageContent.innerHTML = content;
+                }}
                 
                 messageDiv.appendChild(avatar);
                 messageDiv.appendChild(messageContent);

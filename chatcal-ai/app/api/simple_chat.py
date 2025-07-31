@@ -164,7 +164,12 @@ async def simple_chat():
         function showMessage(text, type='assistant') {
             const div = document.createElement('div');
             div.className = 'message ' + type;
-            div.textContent = text;
+            // For assistant messages, render HTML; for user messages, use text only
+            if (type === 'assistant') {
+                div.innerHTML = text;
+            } else {
+                div.textContent = text;
+            }
             messages.appendChild(div);
             messages.scrollTop = messages.scrollHeight;
         }

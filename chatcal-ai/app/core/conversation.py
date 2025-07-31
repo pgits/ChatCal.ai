@@ -3,7 +3,7 @@ from datetime import datetime
 from llama_index.core.llms import ChatMessage, MessageRole
 from llama_index.core.memory import ChatMemoryBuffer
 from app.core.agent import ChatCalAgent
-from app.personality.prompts import GREETING_TEMPLATES
+# GREETING_TEMPLATES removed - no longer needed
 import random
 
 

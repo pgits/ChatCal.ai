@@ -20,6 +20,15 @@ class CalendarTools:
         self.formatter = CalendarFormatter()
         self.agent = agent  # Reference to the ChatCalAgent for user info
     
+    def _generate_meeting_id(self, start_time: datetime, duration_minutes: int) -> str:
+        """Generate a human-readable meeting ID from date-time-duration."""
+        # Format: MMDD-HHMM-DURm (e.g., 0731-1400-60m for July 31 at 2:00 PM for 60 minutes)
+        date_part = start_time.strftime("%m%d")  # MMDD
+        time_part = start_time.strftime("%H%M")  # HHMM
+        duration_part = f"{duration_minutes}m"   # Duration in minutes
+        
+        return f"{date_part}-{time_part}-{duration_part}"
+    
     def check_availability(
         self,
         date_string: str,
@@ -129,6 +138,21 @@ class CalendarTools:
                 create_meet_conference=create_meet_conference
             )
             
+            # Create custom meeting ID based on date-time-duration
+            google_meeting_id = event.get('id', 'unknown')
+            custom_meeting_id = self._generate_meeting_id(start_time, duration_minutes)
+            
+            if self.agent:
+                self.agent.store_meeting_id(custom_meeting_id, {
+                    'title': title,
+                    'start_time': start_time,
+                    'user_name': user_name,
+                    'user_email': user_email,
+                    'user_phone': user_phone,
+                    'google_id': google_meeting_id,
+                    'duration': duration_minutes
+                })
+            
             # Format confirmation
             formatted_time = self.formatter.format_datetime(start_time)
             duration_str = self.formatter.format_duration(duration_minutes)
@@ -145,6 +169,7 @@ class CalendarTools:
             
             # Send email to Peter (always)
             try:
+                print(f"🔄 Attempting to send email to Peter at: {settings.my_email_address}")
                 email_sent_to_peter = email_service.send_invitation_email(
                     to_email=settings.my_email_address,
                     to_name="Peter Michael Gits",
@@ -156,12 +181,15 @@ class CalendarTools:
                     meeting_type=title,
                     meet_link=meet_link
                 )
+                print(f"📧 Peter email send result: {email_sent_to_peter}")
             except Exception as e:
-                print(f"Failed to send email to Peter: {e}")
+                print(f"❌ Failed to send email to Peter: {e}")
+                email_sent_to_peter = False
             
             # Send email to user if they provided email
             if user_email:
                 try:
+                    print(f"🔄 Attempting to send email to user at: {user_email}")
                     email_sent_to_user = email_service.send_invitation_email(
                         to_email=user_email,
                         to_name=user_name or "Guest",
@@ -173,8 +201,10 @@ class CalendarTools:
                         meeting_type=title,
                         meet_link=meet_link
                     )
+                    print(f"📧 User email send result: {email_sent_to_user}")
                 except Exception as e:
-                    print(f"Failed to send email to user: {e}")
+                    print(f"❌ Failed to send email to user: {e}")
+                    email_sent_to_user = False
             
             # Use random confirmation message
             confirmation_template = random.choice(BOOKING_CONFIRMATIONS)
@@ -187,11 +217,19 @@ class CalendarTools:
             
             # Add email status to confirmation
             email_status = ""
-            if user_email and email_sent_to_user:
+            if user_email and email_sent_to_user and email_sent_to_peter:
                 email_status = "\n\n📧 Calendar invitations have been sent to both you and Peter via email."
-            elif user_email and not email_sent_to_user:
+            elif user_email and email_sent_to_user and not email_sent_to_peter:
+                email_status = "\n\n📧 Email invitation sent to you. There was an issue sending Peter's invitation, but the meeting is confirmed."
+            elif user_email and not email_sent_to_user and email_sent_to_peter:
                 email_status = "\n\n📧 Email invitation sent to Peter. There was an issue sending your invitation, but the meeting is confirmed."
-            elif not user_email:
+            elif user_email and not email_sent_to_user and not email_sent_to_peter:
+                email_status = "\n\n📧 There were issues sending email invitations to both you and Peter, but the meeting is confirmed in the calendar."
+            elif not user_email and email_sent_to_peter:
+                email_status = "\n\n📧 Email invitation sent to Peter. If you'd like me to send you a calendar invitation via email, please provide your email address."
+            elif not user_email and not email_sent_to_peter:
+                email_status = "\n\n📧 There was an issue sending Peter's email invitation, but the meeting is confirmed in the calendar. If you'd like me to send you a calendar invitation via email, please provide your email address."
+            else:
                 email_status = "\n\n📧 If you'd like me to send you a calendar invitation via email, please provide your email address."
             
             # Add Google Meet information if conference was created
@@ -208,7 +246,43 @@ class CalendarTools:
                 else:
                     meet_info = "\n\n🎥 Google Meet conference call has been set up (link will be available in your calendar)."
             
-            return f"{confirmation} The meeting is set for {duration_str}.{email_status}{meet_info}"
+            # Add meeting ID and email status with HTML formatting
+            details_html = f"""
+            <div style="background: #f5f5f5; padding: 12px; border-radius: 6px; margin: 10px 0; font-size: 14px;">
+                <strong>⏱️ Duration:</strong> {duration_str}<br>
+                <strong>📋 Meeting ID:</strong> <code style="background: #e0e0e0; padding: 2px 6px; border-radius: 3px;">{custom_meeting_id}</code>
+                <em style="color: #666;">(save this to cancel later)</em>
+            </div>"""
+            
+            # Format email status with better HTML
+            email_html = ""
+            if user_email and email_sent_to_user and email_sent_to_peter:
+                email_html = '<div style="color: #4caf50; margin: 8px 0;"><strong>📧 Invites sent to both you and Peter!</strong></div>'
+            elif user_email and email_sent_to_user and not email_sent_to_peter:
+                email_html = '<div style="color: #ff9800; margin: 8px 0;"><strong>📧 Your invite sent.</strong> Issue with Peter\'s email.</div>'
+            elif user_email and not email_sent_to_user and email_sent_to_peter:
+                email_html = '<div style="color: #ff9800; margin: 8px 0;"><strong>📧 Peter\'s invite sent.</strong> Issue with your email.</div>'
+            elif user_email and not email_sent_to_user and not email_sent_to_peter:
+                email_html = '<div style="color: #f44336; margin: 8px 0;"><strong>📧 Email issues</strong> but meeting is confirmed!</div>'
+            elif not user_email and email_sent_to_peter:
+                email_html = '<div style="color: #2196f3; margin: 8px 0;"><strong>📧 Peter notified!</strong> Want a calendar invite? Just share your email.</div>'
+            elif not user_email and not email_sent_to_peter:
+                email_html = '<div style="color: #ff9800; margin: 8px 0;"><strong>📧 Email issue</strong> but meeting is confirmed!</div>'
+            
+            # Format Google Meet info
+            meet_html = ""
+            if create_meet_conference:
+                if 'conferenceData' in event and 'entryPoints' in event['conferenceData']:
+                    meet_entries = event['conferenceData']['entryPoints']
+                    meet_link = next((entry['uri'] for entry in meet_entries if entry['entryPointType'] == 'video'), None)
+                    if meet_link:
+                        meet_html = f'<div style="background: #e8f5e9; padding: 10px; border-radius: 6px; margin: 8px 0;"><strong>🎥 Google Meet:</strong> <a href="{meet_link}" style="color: #1976d2; font-weight: bold;">Join here</a></div>'
+                    else:
+                        meet_html = '<div style="background: #e8f5e9; padding: 10px; border-radius: 6px; margin: 8px 0;"><strong>🎥 Google Meet set up</strong> (link in your calendar)</div>'
+                else:
+                    meet_html = '<div style="background: #e8f5e9; padding: 10px; border-radius: 6px; margin: 8px 0;"><strong>🎥 Google Meet set up</strong> (link in your calendar)</div>'
+            
+            return f"{confirmation}{details_html}{email_html}{meet_html}"
             
         except Exception as e:
             return f"I'm having trouble creating that appointment right now. Could you try again? (Error: {str(e)})"
@@ -340,6 +414,242 @@ class CalendarTools:
             
         except Exception as e:
             return f"I'm having trouble rescheduling that appointment. Could you try again? (Error: {str(e)})"
+    
+    def cancel_meeting_by_id(self, meeting_id: str) -> str:
+        """
+        Cancel a meeting by its ID (supports both custom and Google IDs).
+        
+        Args:
+            meeting_id: The meeting ID (custom format like 0731-1400-60m or Google ID)
+        
+        Returns:
+            Confirmation message or error
+        """
+        try:
+            google_meeting_id = None
+            meeting_info = None
+            
+            # Check if this is our custom meeting ID format
+            if self.agent:
+                stored_meetings = self.agent.get_stored_meetings()
+                
+                # First try exact match with custom ID
+                if meeting_id in stored_meetings:
+                    meeting_info = stored_meetings[meeting_id]
+                    google_meeting_id = meeting_info.get('google_id')
+                else:
+                    # Try partial match for custom IDs (in case user doesn't type full ID)
+                    for stored_id, info in stored_meetings.items():
+                        if stored_id.startswith(meeting_id):
+                            meeting_info = info
+                            google_meeting_id = info.get('google_id')
+                            meeting_id = stored_id  # Update to full custom ID
+                            break
+            
+            # If not found in custom IDs, treat as Google ID
+            if not google_meeting_id:
+                google_meeting_id = meeting_id
+            
+            # Get meeting details before deletion
+            try:
+                event = self.calendar_service.get_event(google_meeting_id)
+                if not event:
+                    return "Meeting not found. Please check the meeting ID."
+                
+                meeting_title = event.get('summary', 'Meeting')
+                start_time_str = event.get('start', {}).get('dateTime', '')
+                if start_time_str:
+                    start_time = datetime.fromisoformat(start_time_str.replace('Z', '+00:00'))
+                    formatted_time = self.formatter.format_datetime(start_time)
+                else:
+                    formatted_time = "Unknown time"
+                    
+            except Exception:
+                # Fall back to stored info if available
+                if meeting_info:
+                    meeting_title = meeting_info.get('title', 'Meeting')
+                    start_time = meeting_info.get('start_time')
+                    if start_time:
+                        formatted_time = self.formatter.format_datetime(start_time)
+                    else:
+                        formatted_time = "Unknown time"
+                else:
+                    meeting_title = "Meeting"
+                    formatted_time = "Unknown time"
+            
+            # Delete the event using Google ID
+            self.calendar_service.delete_event(google_meeting_id)
+            
+            # Remove from stored meetings using custom ID
+            if self.agent and meeting_id in self.agent.get_stored_meetings():
+                self.agent.remove_stored_meeting(meeting_id)
+            
+            return f"""<div style="background: #ffebee; padding: 15px; border-radius: 8px; border-left: 4px solid #f44336; margin: 10px 0;">
+            <strong>✅ Cancelled!</strong><br>
+            <strong>{meeting_title}</strong><br>
+            <em>was scheduled for {formatted_time}</em>
+            </div>"""
+            
+        except Exception as e:
+            return f"I'm having trouble cancelling that meeting. Could you try again? (Error: {str(e)})"
+    
+    def cancel_meeting_by_details(self, user_name: str, date_string: str, time_string: str = None) -> str:
+        """
+        Cancel a meeting by user name and date/time.
+        
+        Args:
+            user_name: Name of the person who booked the meeting
+            date_string: Date in natural language
+            time_string: Optional time in natural language
+        
+        Returns:
+            Confirmation message or error
+        """
+        try:
+            # Parse the date
+            if time_string:
+                datetime_str = f"{date_string} at {time_string}"
+            else:
+                datetime_str = date_string
+                
+            target_datetime = self.datetime_parser.parse_datetime(datetime_str)
+            if not target_datetime:
+                return "I'm having trouble understanding that date/time. Could you be more specific?"
+            
+            # Search for meetings around that time
+            search_start = target_datetime - timedelta(hours=12)  # Search wider range
+            search_end = target_datetime + timedelta(hours=12)
+            
+            events = self.calendar_service.list_events(
+                time_min=search_start,
+                time_max=search_end,
+                max_results=20
+            )
+            
+            # Find meetings that match the user name
+            matching_events = []
+            for event in events:
+                event_summary = event.get('summary', '').lower()
+                event_description = event.get('description', '').lower()
+                
+                # Check if user name appears in title or description
+                if (user_name.lower() in event_summary or 
+                    user_name.lower() in event_description or
+                    f"meeting with {user_name.lower()}" in event_summary):
+                    matching_events.append(event)
+            
+            if not matching_events:
+                return f"I couldn't find any meetings for {user_name} around {datetime_str}. Please check the details."
+            
+            if len(matching_events) == 1:
+                # Single match - cancel it directly
+                event = matching_events[0]
+                google_meeting_id = event.get('id')
+                
+                # Get meeting details for confirmation
+                meeting_title = event.get('summary', 'Meeting')
+                start_time_str = event.get('start', {}).get('dateTime', '')
+                if start_time_str:
+                    start_time = datetime.fromisoformat(start_time_str.replace('Z', '+00:00'))
+                    formatted_time = self.formatter.format_datetime(start_time)
+                else:
+                    formatted_time = "Unknown time"
+                
+                # Cancel the meeting
+                try:
+                    self.calendar_service.delete_event(google_meeting_id)
+                    
+                    # Remove from stored meetings if exists
+                    if self.agent:
+                        # Find and remove custom meeting ID
+                        stored_meetings = self.agent.get_stored_meetings()
+                        for custom_id, info in stored_meetings.items():
+                            if info.get('google_id') == google_meeting_id:
+                                self.agent.remove_stored_meeting(custom_id)
+                                break
+                    
+                    # Automatically send cancellation email if user has email (no asking)
+                    email_sent = False
+                    if self.agent and self.agent.user_info.get('email'):
+                        user_email = self.agent.user_info.get('email')
+                        user_name_for_email = self.agent.user_info.get('name', user_name)
+                        
+                        try:
+                            from app.core.email_service import email_service
+                            email_sent = email_service.send_cancellation_email(
+                                to_email=user_email,
+                                to_name=user_name_for_email,
+                                meeting_title=meeting_title,
+                                original_datetime=start_time
+                            )
+                        except Exception as e:
+                            print(f"Failed to send cancellation email: {e}")
+                            email_sent = False
+                    
+                    # Only show confirmation after email is processed
+                    if email_sent:
+                        return f"""<div style="background: #ffebee; padding: 15px; border-radius: 8px; border-left: 4px solid #f44336; margin: 10px 0;">
+                        <strong>✅ Cancelled & Confirmed!</strong><br>
+                        <strong>{meeting_title}</strong><br>
+                        <em>was scheduled for {formatted_time}</em><br>
+                        <span style="color: #4caf50;">📧 Cancellation details sent to your email</span>
+                        </div>"""
+                    else:
+                        return f"""<div style="background: #ffebee; padding: 15px; border-radius: 8px; border-left: 4px solid #f44336; margin: 10px 0;">
+                        <strong>✅ Cancelled!</strong><br>
+                        <strong>{meeting_title}</strong><br>
+                        <em>was scheduled for {formatted_time}</em>
+                        </div>"""
+                    
+                except Exception as e:
+                    return f"I had trouble cancelling that meeting. Error: {str(e)}"
+                    
+            elif len(matching_events) > 1:
+                # Multiple matches - check if any match closely on time
+                if time_string:
+                    # Try to narrow down by time matching
+                    target_time = self.datetime_parser.parse_time(time_string)
+                    if target_time:
+                        target_hour, target_minute = target_time
+                        close_matches = []
+                        
+                        for event in matching_events:
+                            event_start = datetime.fromisoformat(event['start']['dateTime'].replace('Z', '+00:00'))
+                            # Match within 1 hour of target time
+                            if abs(event_start.hour - target_hour) <= 1:
+                                close_matches.append(event)
+                        
+                        if len(close_matches) == 1:
+                            # Found one close match - cancel it
+                            return self.cancel_meeting_by_details(user_name, date_string, time_string)
+                
+                # Still multiple matches - only show meeting IDs if needed
+                options = []
+                for i, event in enumerate(matching_events[:3], 1):  # Limit to 3
+                    event_time = datetime.fromisoformat(event['start']['dateTime'].replace('Z', '+00:00'))
+                    formatted_time = self.formatter.format_datetime(event_time)
+                    event_title = event.get('summary', 'Meeting')
+                    
+                    # Find custom meeting ID if available
+                    custom_id = "N/A"
+                    if self.agent:
+                        stored_meetings = self.agent.get_stored_meetings()
+                        for stored_id, info in stored_meetings.items():
+                            if info.get('google_id') == event.get('id'):
+                                custom_id = stored_id
+                                break
+                    
+                    options.append(f"• <strong>{event_title}</strong> - {formatted_time}")
+                
+                options_text = "<br>".join(options)
+                return f"""<div style="background: #fff3e0; padding: 15px; border-radius: 8px; border-left: 4px solid #ff9800; margin: 10px 0;">
+                <strong>🤔 Found multiple meetings for {user_name}:</strong><br><br>
+                {options_text}<br><br>
+                Can you be more specific about the time, or provide the meeting ID?
+                </div>"""
+            
+        except Exception as e:
+            return f"I'm having trouble finding that meeting. Could you try again? (Error: {str(e)})"
 
     def create_appointment_with_user_info(
         self,
@@ -418,5 +728,15 @@ class CalendarTools:
                 fn=self.reschedule_appointment,
                 name="reschedule_appointment",
                 description="Reschedule an existing appointment to a new date/time. Use this when users want to move or change an existing meeting."
+            ),
+            FunctionTool.from_defaults(
+                fn=self.cancel_meeting_by_id,
+                name="cancel_meeting_by_id",
+                description="Cancel a meeting using its meeting ID. Use this when users provide a meeting ID to cancel."
+            ),
+            FunctionTool.from_defaults(
+                fn=self.cancel_meeting_by_details,
+                name="cancel_meeting_by_details", 
+                description="Cancel a meeting by user name and date/time. Use this when users want to cancel but don't have the meeting ID."
             )
         ]

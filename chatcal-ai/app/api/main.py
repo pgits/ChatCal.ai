@@ -49,6 +49,12 @@ app.add_middleware(
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Log testing mode status on startup
+if settings.testing_mode:
+    logger.info("🧪 TESTING MODE ENABLED - Peter's email will be treated as regular user email")
+else:
+    logger.info("📧 Production mode - Peter's email will receive special formatting")
+
 # Calendar auth instance
 calendar_auth = CalendarAuth()
 
@@ -179,15 +185,19 @@ async def health_check():
         logger.error(f"Redis health check failed: {e}")
         services["database"] = "unhealthy"
     
-    # Check Gemini LLM
+    # Check Groq LLM (via anthropic_llm interface)
     try:
-        if gemini_llm.test_connection():
+        from app.core.llm_anthropic import anthropic_llm
+        if anthropic_llm.test_connection():
             services["llm"] = "healthy"
         else:
             services["llm"] = "unhealthy"
     except Exception as e:
         logger.error(f"LLM health check failed: {e}")
         services["llm"] = "not_configured"
+    
+    # Add testing mode status
+    services["testing_mode"] = "enabled" if settings.testing_mode else "disabled"
     
     # Check Calendar service
     try:

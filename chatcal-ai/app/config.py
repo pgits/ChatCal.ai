@@ -11,11 +11,14 @@ class Settings(BaseSettings):
     app_host: str = Field(default="0.0.0.0", env="APP_HOST")
     app_port: int = Field(default=8000, env="APP_PORT")
     
+    # Groq API (primary)
+    groq_api_key: str = Field(..., env="GROQ_API_KEY")
+    
     # Anthropic (optional - fallback)
     anthropic_api_key: Optional[str] = Field(None, env="ANTHROPIC_API_KEY")
     
-    # Gemini API
-    gemini_api_key: str = Field(..., env="GEMINI_API_KEY")
+    # Gemini API (optional - fallback)
+    gemini_api_key: Optional[str] = Field(None, env="GEMINI_API_KEY")
     
     # Google Calendar
     google_calendar_id: str = Field(default="pgits.job@gmail.com", env="GOOGLE_CALENDAR_ID")
@@ -50,6 +53,9 @@ class Settings(BaseSettings):
     smtp_username: Optional[str] = Field(None, env="SMTP_USERNAME")
     smtp_password: Optional[str] = Field(None, env="SMTP_PASSWORD")
     email_from_name: str = Field(default="ChatCal.ai", env="EMAIL_FROM_NAME")
+    
+    # Testing Configuration
+    testing_mode: bool = Field(default=True, env="TESTING_MODE")  # Set to True to ignore Peter's email validation
     
     class Config:
         env_file = ".env"

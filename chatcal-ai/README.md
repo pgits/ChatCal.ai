@@ -1,25 +1,31 @@
-# ChatCal.ai - Friendly Google Calendar Booking Assistant
+# ChatCal.ai - AI-Powered Calendar Assistant
 
-A jovial and encouraging AI chatbot powered by Anthropic's Claude and LlamaIndex that helps users book appointments on Google Calendar with a delightful conversational experience.
+An intelligent AI scheduling assistant powered by Groq's Llama-3.1-8b-instant and LlamaIndex that helps users book appointments on Google Calendar with natural conversation and smart features.
 
 ## Features
 
-- 🤖 Powered by Anthropic's Claude for natural conversations
-- 📅 Seamless Google Calendar integration
-- 🌟 Friendly, encouraging personality that makes scheduling fun
-- 🐳 Fully containerized with Docker for easy deployment
-- 🚀 FastAPI backend with Redis session management
-- 🔒 Secure OAuth2 authentication for Google Calendar
-- 🌍 Timezone-aware scheduling
-- 💬 Context-aware multi-turn conversations
+- 🤖 **Groq-powered LLM**: Fast, efficient conversation using Llama-3.1-8b-instant
+- 📅 **Smart Calendar Integration**: Seamless Google Calendar booking with conflict detection
+- 🧠 **Conversation Memory**: Persistent context across multi-turn conversations
+- 🎨 **HTML-formatted Responses**: Rich, styled responses for better readability
+- 🆔 **Custom Meeting IDs**: Human-readable meeting IDs (MMDD-HHMM-DURm format)
+- 🗑️ **Smart Cancellation**: Intelligent meeting matching with automatic email notifications
+- 🎥 **Google Meet Integration**: Automatic video conference setup for remote meetings
+- 📧 **Email Notifications**: Automated booking confirmations and cancellation notices
+- 🧪 **Testing Mode**: Configurable testing environment for development
+- 🚀 **FastAPI Backend**: High-performance API with Redis session management
+- 🔒 **Secure Authentication**: OAuth2 for Google Calendar access
+- 🌍 **Timezone-aware**: Smart scheduling across time zones
 
 ## Prerequisites
 
 - Python 3.11+
 - Docker and Docker Compose
-- Anthropic API key (unlimited account)
+- Groq API key (primary LLM)
+- Anthropic API key (optional fallback)
 - Google Cloud Project with Calendar API enabled
 - Google OAuth2 credentials
+- SMTP credentials for email notifications
 
 ## Quick Start
 
@@ -35,9 +41,13 @@ cp .env.example .env
 ```
 
 Edit `.env` with your credentials:
-- `ANTHROPIC_API_KEY`: Your Anthropic API key
+- `GROQ_API_KEY`: Your Groq API key (primary)
+- `ANTHROPIC_API_KEY`: Your Anthropic API key (optional fallback)
 - `GOOGLE_CLIENT_ID` & `GOOGLE_CLIENT_SECRET`: From Google Cloud Console
 - `SECRET_KEY`: Generate a secure secret key
+- `MY_PHONE_NUMBER` & `MY_EMAIL_ADDRESS`: Contact information
+- `SMTP_USERNAME` & `SMTP_PASSWORD`: Email service credentials
+- `TESTING_MODE`: Set to true for development (ignores Peter's email validation)
 
 ### 3. Google Calendar Setup
 
@@ -94,11 +104,11 @@ uvicorn app.api.main:app --reload
 ```
 chatcal-ai/
 ├── app/
-│   ├── core/           # LlamaIndex agent & Anthropic setup
+│   ├── core/           # Agent, LLM (Groq), tools, and email service
 │   ├── calendar/       # Google Calendar integration
-│   ├── api/           # FastAPI endpoints
-│   └── personality/   # Chatbot personality prompts
-├── frontend/          # Web UI (React/Streamlit)
+│   ├── api/           # FastAPI endpoints (simple-chat, chat-widget)
+│   └── personality/   # System prompts and response templates
+├── frontend/          # Web UI with HTML response rendering
 ├── docker/           # Docker configurations
 ├── tests/           # Test suite
 ├── credentials/     # Google credentials (gitignored)
@@ -107,11 +117,13 @@ chatcal-ai/
 
 ## API Endpoints
 
-- `POST /chat` - Send a message to the chatbot
+- `POST /chat` - Send a message to the chatbot (with HTML response support)
+- `GET /simple-chat` - Simple chat interface for testing
+- `GET /chat-widget` - Embeddable chat widget with HTML rendering
 - `GET /health` - Health check endpoint
+- `POST /sessions` - Create new session
 - `GET /auth/login` - Initiate Google OAuth flow
 - `GET /auth/callback` - OAuth callback handler
-- `GET /sessions/{session_id}` - Get conversation history
 
 ## Deployment
 
@@ -142,6 +154,28 @@ Add the chat widget to any webpage:
 </iframe>
 ```
 
+## Key Features
+
+### Conversation Memory
+- Persistent conversation context using ChatMemoryBuffer
+- Multi-turn dialog support for complex booking flows
+- User information extraction and retention
+
+### Smart Meeting Management
+- **Custom Meeting IDs**: Format MMDD-HHMM-DURm (e.g., 0731-1400-60m)
+- **Intelligent Cancellation**: Matches meetings by user name and date/time
+- **Automatic Email Notifications**: Booking confirmations and cancellation notices
+
+### HTML Response Formatting
+- Rich, styled responses with proper formatting
+- Color-coded status messages (confirmations, cancellations, errors)
+- Easy-to-read meeting details and contact information
+
+### Google Meet Integration
+- Automatic detection of video meeting requests
+- Google Meet link generation and embedding
+- Support for both in-person and remote meetings
+
 ## Configuration
 
 See `app/config.py` for all available settings. Key configurations:
@@ -149,6 +183,7 @@ See `app/config.py` for all available settings. Key configurations:
 - `MAX_CONVERSATION_HISTORY`: Number of messages to maintain in context
 - `SESSION_TIMEOUT_MINUTES`: Session expiration time
 - `DEFAULT_TIMEZONE`: Default timezone for appointments
+- `TESTING_MODE`: Enable/disable testing features
 
 ## Testing
 

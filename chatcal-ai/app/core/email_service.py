@@ -92,13 +92,16 @@ END:VCALENDAR"""
             msg['To'] = f"{to_name} <{to_email}>"
             
             # Create email body
-            if to_email == settings.my_email_address:
+            # In testing mode, treat Peter's email as a regular user email for testing purposes
+            is_peter_email = (to_email == settings.my_email_address and not settings.testing_mode)
+            
+            if is_peter_email:
                 # Email to Peter
                 html_body = self._create_peter_email_body(
                     title, start_datetime, end_datetime, description, to_name, user_phone, meet_link
                 )
             else:
-                # Email to user
+                # Email to user (or Peter's email in testing mode)
                 html_body = self._create_user_email_body(
                     title, start_datetime, end_datetime, description, meeting_type, meet_link
                 )
@@ -133,6 +136,7 @@ END:VCALENDAR"""
             
             # Send email
             if self.password:  # Only send if SMTP credentials are configured
+                print(f"🔧 SMTP configured, sending email to {to_email}")
                 with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
                     server.starttls()
                     server.login(self.username, self.password)
@@ -141,11 +145,109 @@ END:VCALENDAR"""
                 print(f"✅ Email invitation sent to {to_email}")
                 return True
             else:
+                print(f"⚠️ SMTP not configured (no password), skipping actual email send to {to_email}")
                 print(f"📧 Email invitation prepared for {to_email} (SMTP not configured)")
                 return True  # Consider it successful for demo purposes
                 
         except Exception as e:
             print(f"❌ Failed to send email to {to_email}: {e}")
+            return False
+    
+    def send_cancellation_email(self,
+                              to_email: str,
+                              to_name: str,
+                              meeting_title: str,
+                              original_datetime: datetime) -> bool:
+        """Send a meeting cancellation email."""
+        
+        try:
+            # Create email message
+            msg = MIMEMultipart('alternative')
+            msg['Subject'] = f"Meeting Cancelled: {meeting_title}"
+            msg['From'] = f"{self.from_name} <{self.from_email}>"
+            msg['To'] = f"{to_name} <{to_email}>"
+            
+            # Create email body
+            formatted_time = original_datetime.strftime('%A, %B %d, %Y at %I:%M %p %Z')
+            
+            html_body = f"""
+            <html>
+            <body style="font-family: Arial, sans-serif; margin: 20px; color: #333;">
+                <h2 style="color: #f44336;">❌ Meeting Cancelled</h2>
+                
+                <div style="background: #ffebee; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #f44336;">
+                    <h3 style="margin-top: 0; color: #c62828;">{meeting_title}</h3>
+                    
+                    <div style="margin: 15px 0;">
+                        <strong>📅 Was scheduled for:</strong><br>
+                        {formatted_time}
+                    </div>
+                    
+                    <div style="margin: 15px 0;">
+                        <strong>👤 With:</strong> Peter Michael Gits<br>
+                        <strong>📞 Peter's Phone:</strong> {settings.my_phone_number}<br>
+                        <strong>📧 Peter's Email:</strong> {settings.my_email_address}
+                    </div>
+                </div>
+                
+                <div style="background: #e3f2fd; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #2196f3;">
+                    <h4 style="margin-top: 0; color: #1565c0;">Need to reschedule?</h4>
+                    <p style="margin-bottom: 0; color: #1565c0;">
+                        Feel free to book a new appointment through ChatCal.ai or contact Peter directly.
+                    </p>
+                </div>
+                
+                <p style="color: #6c757d; font-size: 14px;">
+                    This cancellation was processed through ChatCal.ai.
+                </p>
+                
+                <hr style="border: none; border-top: 1px solid #dee2e6; margin: 20px 0;">
+                <p style="color: #6c757d; font-size: 12px;">
+                    Sent by ChatCal.ai - Peter Michael Gits' AI Scheduling Assistant<br>
+                    Peter: {settings.my_phone_number} | {settings.my_email_address}
+                </p>
+            </body>
+            </html>
+            """
+            
+            # Create plain text version
+            text_body = f"""
+Meeting Cancelled: {meeting_title}
+
+Was scheduled for: {formatted_time}
+With: Peter Michael Gits
+
+Need to reschedule? Contact Peter:
+Phone: {settings.my_phone_number}
+Email: {settings.my_email_address}
+
+This cancellation was processed through ChatCal.ai.
+            """.strip()
+            
+            # Attach both versions
+            part1 = MIMEText(text_body, 'plain')
+            part2 = MIMEText(html_body, 'html')
+            
+            msg.attach(part1)
+            msg.attach(part2)
+            
+            # Send email
+            if self.password:  # Only send if SMTP credentials are configured
+                print(f"🔧 SMTP configured, sending cancellation email to {to_email}")
+                with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
+                    server.starttls()
+                    server.login(self.username, self.password)
+                    server.send_message(msg)
+                
+                print(f"✅ Cancellation email sent to {to_email}")
+                return True
+            else:
+                print(f"⚠️ SMTP not configured, skipping cancellation email to {to_email}")
+                print(f"📧 Cancellation email prepared for {to_email} (SMTP not configured)")
+                return True  # Consider it successful for demo purposes
+                
+        except Exception as e:
+            print(f"❌ Failed to send cancellation email to {to_email}: {e}")
             return False
     
     def _create_peter_email_body(self, title: str, start_datetime: datetime, 

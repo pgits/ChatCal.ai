@@ -1,12 +1,12 @@
 """Main ChatCal.ai agent that combines LLM with calendar tools."""
 
 from typing import List, Dict, Optional
-from llama_index.core.agent import ReActAgent
+from llama_index.core.llms import ChatMessage, MessageRole
 from llama_index.core.tools import BaseTool
 from llama_index.core.memory import ChatMemoryBuffer
 from app.core.llm_anthropic import anthropic_llm
 from app.core.tools import CalendarTools
-from app.personality.prompts import SYSTEM_PROMPT, GREETING_TEMPLATES, ENCOURAGEMENT_PHRASES
+from app.personality.prompts import SYSTEM_PROMPT, ENCOURAGEMENT_PHRASES
 from app.config import settings
 import random
 
@@ -27,6 +27,16 @@ class ChatCalAgent:
             "preferences": {}
         }
         
+        # Meeting ID storage for cancellation tracking
+        self.stored_meetings = {}
+        
+        # Conversation state for multi-turn operations
+        self.conversation_state = {
+            "pending_operation": None,  # "cancellation", "booking", etc.
+            "operation_context": {},    # Context data for the pending operation
+            "awaiting_clarification": False  # Whether we're waiting for user clarification
+        }
+        
         # Set up memory
         self.memory = ChatMemoryBuffer(token_limit=3000)
         
@@ -34,9 +44,9 @@ class ChatCalAgent:
         self.agent = self._create_agent()
         self.conversation_started = False
     
-    def _create_agent(self) -> ReActAgent:
+    def _create_agent(self):
         """Create the ReAct agent with calendar tools."""
-        # Get calendar tools
+        # Get calendar tools 
         tools = self.calendar_tools.get_tools()
         
         # Get current user context
@@ -52,66 +62,21 @@ class ChatCalAgent:
 
 {user_context}
 
-## Calendar Assistant Capabilities
+## Response Guidelines
 
-You have access to the following calendar management tools:
-1. **check_availability**: Find free time slots on specific dates
-2. **create_appointment**: Schedule new meetings and appointments  
-3. **list_upcoming_events**: Show upcoming calendar events
-4. **reschedule_appointment**: Move existing appointments to new times
+- Be conversational and natural, like a helpful human assistant
+- Keep responses concise and focused on the user's needs
+- Never mention tools, capabilities, or technical details unless asked
+- If user provides contact info (email/phone), remember it and use it
+- Never ask for "secondary email" or additional contact if they already provided one
+- If you have all required info (name + contact), book immediately without asking for confirmation
+- Format responses with proper line breaks - each detail on its own line"""
 
-## User Information Guidelines
-
-- ALWAYS collect user information early: full name, email, phone number
-- Store and remember this information throughout the conversation
-- Use the user's name once you know it
-- When showing availability, present times in a clear, selectable format
-- Before booking, confirm all details including user contact information
-
-## Availability Requests Recognition
-
-Recognize these patterns as availability requests and ALWAYS use the check_availability tool:
-- "What times does Peter have free [date]?"
-- "What's Peter's availability for [date]?"
-- "Show me Peter's open slots [date]"
-- "When is Peter available [date]?"
-- "Check Peter's schedule for [date]"
-- "What times are available [date]?"
-
-## Example Availability Response
-
-When user asks "What times does Peter have free tomorrow?":
-1. Use check_availability tool with date="tomorrow"
-2. Format response like: "Here are Peter's available time slots for tomorrow:
-• 9:00 AM - 10:00 AM
-• 11:30 AM - 12:30 PM  
-• 2:00 PM - 3:00 PM
-• 4:00 PM - 5:00 PM
-
-Which time would work best for you, [user's name]?"
-
-## Example Interactions
-
-User: "I need to schedule a meeting with Peter next week"
-You: "I'd be happy to help you schedule time with Peter! First, may I have your full name for the appointment?"
-
-User: "What times does Peter have free tomorrow?"
-You: [Use check_availability tool] "Here are Peter's available times for tomorrow: [list times]"
-
-User: "My name is John Smith, email john@example.com"
-You: "Thank you, John! I have your information. Now, what type of meeting would you like to schedule with Peter?"
-
-Always maintain your professional yet friendly personality while collecting complete user information!"""
-
-        # Create agent with explicit system prompt
-        agent = ReActAgent.from_tools(
-            tools=tools,
-            llm=self.llm,
-            verbose=True,
-            memory=self.memory,
-            system_prompt=enhanced_system_prompt,
-            max_iterations=10
-        )
+        # Use direct LLM chat for now (avoiding complex agent API issues)
+        # The tools will be called manually based on message analysis
+        self.tools = tools
+        self.system_prompt = enhanced_system_prompt
+        agent = self  # Use self as the agent
         
         # Override the system prompt directly on the agent if possible
         if hasattr(agent, '_system_prompt'):
@@ -121,44 +86,321 @@ Always maintain your professional yet friendly personality while collecting comp
     
     def _get_user_context(self) -> str:
         """Generate user context for the system prompt."""
-        if not any(self.user_info.values()):
-            return f"## Current User Information\n🚫 NO USER INFORMATION COLLECTED YET - REQUIRED BEFORE BOOKING\nYou MUST collect name AND at least one contact method (email OR phone) before any appointment booking.\n💡 Alternative: Offer Peter's direct number {settings.my_phone_number} or email {settings.my_email_address}\n⛔ DO NOT USE create_appointment TOOL WITHOUT CONTACT INFO ⛔"
-        
-        context = "## Current User Information\n"
-        if self.user_info["name"]:
-            context += f"- ✅ Name: {self.user_info['name']}\n"
-        if self.user_info["email"]:
-            context += f"- ✅ Email: {self.user_info['email']}\n"
-        if self.user_info["phone"]:
-            context += f"- ✅ Phone: {self.user_info['phone']}\n"
+        missing = []
+        if not self.user_info.get("name"):
+            missing.append("first name")
+        if not self.user_info.get("email") and not self.user_info.get("phone"):
+            missing.append("contact (email or phone)")
             
-        # Check what's missing
-        missing_name = not self.user_info["name"]
-        missing_contact = not self.user_info["email"] and not self.user_info["phone"]
-        
-        if missing_name or missing_contact:
-            context += "\n🚫 MISSING REQUIRED INFO: "
-            missing_items = []
-            if missing_name:
-                missing_items.append("NAME")
-            if missing_contact:
-                missing_items.append("CONTACT (email OR phone)")
-            context += ", ".join(missing_items) + "\n"
-            
-            if missing_contact:
-                context += f"💡 ALTERNATIVES: Offer Peter's direct number {settings.my_phone_number} or email {settings.my_email_address}\n"
-            context += "🚫🚫 ABSOLUTELY DO NOT USE create_appointment TOOL UNTIL REQUIRED INFO IS COLLECTED! 🚫🚫\n"
-            context += "⛔ BOOKING IS FORBIDDEN WITHOUT CONTACT INFORMATION ⛔\n"
+        if missing:
+            return f"## Missing Info: {', '.join(missing)}"
         else:
-            # Check if we have both contacts (preferred) or just one
-            if self.user_info["email"] and self.user_info["phone"]:
-                context += "\n✅ ALL INFORMATION COLLECTED (Name + Both Contacts) - Ready to book appointments\n"
-            else:
-                contact_type = "email" if self.user_info["email"] else "phone"
-                context += f"\n✅ REQUIRED INFORMATION COLLECTED (Name + {contact_type}) - Ready to book appointments\n"
-                context += "💡 Consider asking for additional contact method for better communication\n"
+            return "## User Info: Complete - ready to book"
+    
+    def _get_conversation_state_context(self) -> str:
+        """Generate conversation state context for the system prompt."""
+        if not self.conversation_state["pending_operation"]:
+            return ""
+        
+        if self.conversation_state["pending_operation"] == "cancellation" and self.conversation_state["awaiting_clarification"]:
+            context = self.conversation_state["operation_context"]
+            return f"""## Conversation State: AWAITING CANCELLATION CLARIFICATION
+- User wants to cancel a meeting for: {context.get('user_name', 'unknown')}
+- Original date/time info: {context.get('date_string', 'none')} {context.get('time_string', 'none')}
+- Waiting for user to provide more specific time/date details
+- Do NOT ask about meeting purpose - only ask for time/date clarification if needed"""
+        
+        return ""
+    
+    def _process_message_with_llm(self, message: str) -> str:
+        """Process message using direct LLM calls with manual tool invocation."""
+        try:
+            # Check if we need to call any tools based on the message
+            tool_result = self._check_and_call_tools(message)
             
-        return context
+            # Create enhanced message with tool results if any
+            enhanced_message = message
+            if tool_result:
+                enhanced_message = f"[Tool Result: {tool_result}]\n\nUser: {message}"
+            
+            # Add user message to memory
+            user_message = ChatMessage(role=MessageRole.USER, content=enhanced_message)
+            self.memory.put(user_message)
+            
+            # Build conversation history for LLM with updated user context
+            current_user_context = self._get_user_context()
+            conversation_state_context = self._get_conversation_state_context()
+            
+            current_system_prompt = f"""{self.system_prompt.split('## Missing Info:')[0].split('## User Info:')[0].rstrip()}
+
+{current_user_context}
+
+{conversation_state_context}
+
+## Response Guidelines
+
+- Be conversational and natural, like a helpful human assistant
+- Keep responses concise and focused on the user's needs
+- Never mention tools, capabilities, or technical details unless asked
+- If user provides contact info (email/phone), remember it and use it
+- Never ask for "secondary email" or additional contact if they already provided one
+- If you have all required info (name + contact), book immediately without asking for confirmation
+- Format responses with proper line breaks - each detail on its own line"""
+            
+            messages = [ChatMessage(role=MessageRole.SYSTEM, content=current_system_prompt)]
+            
+            # Add conversation history from memory
+            history_messages = self.memory.get_all()
+            messages.extend(history_messages)
+            
+            # Get LLM response
+            response = self.llm.chat(messages)
+            response_text = response.message.content
+            
+            # Add assistant response to memory
+            assistant_message = ChatMessage(role=MessageRole.ASSISTANT, content=response_text)
+            self.memory.put(assistant_message)
+            
+            return response_text
+            
+        except Exception as e:
+            print(f"LLM processing error: {e}")
+            import traceback
+            traceback.print_exc()
+            return "I'm having trouble processing your request right now. Could you try again?"
+    
+    def _check_and_call_tools(self, message: str) -> str:
+        """Check if message requires tool calls and execute them."""
+        import re
+        
+        # Check for booking requests
+        booking_patterns = [
+            r"schedule|book|appointment|meeting",
+            r"available|availability|free time",
+            r"reschedule|move|change",
+            r"cancel|delete|remove"
+        ]
+        
+        message_lower = message.lower()
+        
+        # Check availability requests
+        if any(word in message_lower for word in ["available", "availability", "free", "open"]):
+            # Extract date from message (basic pattern matching)
+            date_patterns = [
+                r"tomorrow",
+                r"today", 
+                r"monday|tuesday|wednesday|thursday|friday|saturday|sunday",
+                r"\d{1,2}/\d{1,2}",
+                r"next week",
+                r"this week"
+            ]
+            
+            date_found = None
+            for pattern in date_patterns:
+                match = re.search(pattern, message_lower)
+                if match:
+                    date_found = match.group()
+                    break
+            
+            if date_found:
+                try:
+                    # Call availability tool
+                    availability_tool = None
+                    for tool in self.tools:
+                        if "availability" in tool.metadata.name.lower():
+                            availability_tool = tool
+                            break
+                    
+                    if availability_tool:
+                        result = availability_tool.call(date=date_found)
+                        return f"Availability check result: {result}"
+                except Exception as e:
+                    return f"Could not check availability: {str(e)}"
+        
+        # Check for booking requests with complete info
+        if self.has_complete_user_info() and any(word in message_lower for word in ["schedule", "book", "appointment", "meeting"]):
+            try:
+                # Extract meeting details (basic implementation)
+                meeting_type = "consultation"  # Default
+                duration = 60  # Default
+                
+                # Try to create appointment
+                create_tool = None
+                for tool in self.tools:
+                    if "create" in tool.metadata.name.lower() or "appointment" in tool.metadata.name.lower():
+                        create_tool = tool
+                        break
+                
+                if create_tool:
+                    result = create_tool.call(
+                        title=f"Meeting with {self.user_info['name']}",
+                        attendee_email=self.user_info.get('email', ''),
+                        duration=duration
+                    )
+                    return f"Appointment creation result: {result}"
+            except Exception as e:
+                return f"Could not create appointment: {str(e)}"
+        
+        # First check if we're continuing a cancellation conversation
+        if self.conversation_state["pending_operation"] == "cancellation" and self.conversation_state["awaiting_clarification"]:
+            # User is providing clarification for a pending cancellation
+            context = self.conversation_state["operation_context"]
+            print(f"🔄 Processing cancellation clarification from {context.get('user_name')}: '{message}'")
+            
+            # Extract time/date information from the clarification
+            time_patterns = [
+                r"\d{1,2}:\d{2}\s*(?:am|pm)",
+                r"\d{1,2}\s*(?:am|pm)",
+                r"morning|afternoon|evening|noon"
+            ]
+            
+            date_patterns = [
+                r"tomorrow|today|monday|tuesday|wednesday|thursday|friday|saturday|sunday",
+                r"\d{1,2}/\d{1,2}",
+                r"next week|this week"
+            ]
+            
+            # Look for additional time/date info in the clarification
+            additional_time = None
+            additional_date = None
+            
+            for pattern in time_patterns:
+                match = re.search(pattern, message_lower)
+                if match:
+                    additional_time = match.group()
+                    break
+            
+            for pattern in date_patterns:
+                match = re.search(pattern, message_lower)
+                if match:
+                    additional_date = match.group()
+                    break
+            
+            # Use the clarification to complete the cancellation
+            try:
+                cancel_tool = None
+                for tool in self.tools:
+                    if "cancel" in tool.metadata.name.lower() and "details" in tool.metadata.name.lower():
+                        cancel_tool = tool
+                        break
+                
+                if cancel_tool:
+                    # Use stored context plus any new info from clarification
+                    final_date = additional_date or context.get("date_string", "")
+                    final_time = additional_time or context.get("time_string", "")
+                    
+                    result = cancel_tool.call(
+                        user_name=context["user_name"],
+                        date_string=final_date,
+                        time_string=final_time
+                    )
+                    
+                    # Clear the conversation state
+                    self.conversation_state = {
+                        "pending_operation": None,
+                        "operation_context": {},
+                        "awaiting_clarification": False
+                    }
+                    print(f"✅ Cleared conversation state after successful cancellation")
+                    
+                    return result
+            except Exception as e:
+                # Clear state on error
+                self.conversation_state = {
+                    "pending_operation": None,
+                    "operation_context": {},
+                    "awaiting_clarification": False
+                }
+                print(f"❌ Cleared conversation state after cancellation error: {str(e)}")
+                return f"Could not cancel meeting: {str(e)}"
+        
+        # Check for new cancellation requests
+        elif any(word in message_lower for word in ["cancel", "delete", "remove"]) and any(word in message_lower for word in ["meeting", "appointment"]):
+            # Look for meeting ID in message first
+            meeting_id_pattern = r"\b\d{4}-\d{4}-\d+m\b"  # Our custom format: MMDD-HHMM-DURm
+            meeting_ids = re.findall(meeting_id_pattern, message)
+            
+            if meeting_ids:
+                # Try to cancel by custom meeting ID
+                try:
+                    cancel_tool = None
+                    for tool in self.tools:
+                        if "cancel" in tool.metadata.name.lower() and "id" in tool.metadata.name.lower():
+                            cancel_tool = tool
+                            break
+                    
+                    if cancel_tool:
+                        result = cancel_tool.call(meeting_id=meeting_ids[0])
+                        return result  # Return direct result (already formatted HTML)
+                except Exception as e:
+                    return f"Could not cancel meeting: {str(e)}"
+            else:
+                # Try to cancel by user name and date (never ask about purpose)
+                if self.user_info.get('name'):
+                    try:
+                        # Extract date from message
+                        date_patterns = [
+                            r"tomorrow|today|monday|tuesday|wednesday|thursday|friday|saturday|sunday",
+                            r"\d{1,2}/\d{1,2}",
+                            r"next week|this week|friday|monday|tuesday|wednesday|thursday"
+                        ]
+                        
+                        # Extract time from message
+                        time_patterns = [
+                            r"\d{1,2}:\d{2}\s*(?:am|pm)",
+                            r"\d{1,2}\s*(?:am|pm)",
+                            r"morning|afternoon|evening|noon"
+                        ]
+                        
+                        date_found = None
+                        time_found = None
+                        
+                        for pattern in date_patterns:
+                            match = re.search(pattern, message_lower)
+                            if match:
+                                date_found = match.group()
+                                break
+                        
+                        for pattern in time_patterns:
+                            match = re.search(pattern, message_lower)
+                            if match:
+                                time_found = match.group()
+                                break
+                        
+                        if date_found:
+                            cancel_tool = None
+                            for tool in self.tools:
+                                if "cancel" in tool.metadata.name.lower() and "details" in tool.metadata.name.lower():
+                                    cancel_tool = tool
+                                    break
+                            
+                            if cancel_tool:
+                                result = cancel_tool.call(
+                                    user_name=self.user_info['name'],
+                                    date_string=date_found,
+                                    time_string=time_found
+                                )
+                                
+                                # Check if the result is asking for clarification
+                                if "Found multiple meetings" in result or "Can you be more specific" in result:
+                                    # Store the cancellation context
+                                    self.conversation_state = {
+                                        "pending_operation": "cancellation",
+                                        "operation_context": {
+                                            "user_name": self.user_info['name'],
+                                            "date_string": date_found,
+                                            "time_string": time_found,
+                                            "original_message": message
+                                        },
+                                        "awaiting_clarification": True
+                                    }
+                                    print(f"🔄 Set conversation state: awaiting cancellation clarification for {self.user_info['name']}")
+                                
+                                return result  # Return direct result (already formatted HTML)
+                    except Exception as e:
+                        return f"Could not cancel meeting: {str(e)}"
+        
+        return ""
     
     def update_user_info(self, info_type: str, value: str) -> bool:
         """Update user information."""
@@ -259,11 +501,9 @@ Always maintain your professional yet friendly personality while collecting comp
         return extracted
     
     def start_conversation(self) -> str:
-        """Start a new conversation with greeting."""
+        """Start a new conversation."""
         if not self.conversation_started:
-            greeting = random.choice(GREETING_TEMPLATES)
             self.conversation_started = True
-            return greeting
         return ""
     
     def chat(self, message: str) -> str:
@@ -298,17 +538,18 @@ Always maintain your professional yet friendly personality while collecting comp
             for info_type, value in extracted_info.items():
                 if not self.user_info.get(info_type):  # Only update if we don't already have this info
                     self.update_user_info(info_type, value)
+                    print(f"📝 Extracted {info_type}: {value}")
+            
+            # Debug: Show current user info status
+            if extracted_info:
+                print(f"👤 Current user info: {self.user_info}")
             
             # Start conversation if needed
             if not self.conversation_started:
-                greeting = self.start_conversation()
-                # For the first message, respond with greeting + handling the message
-                response = self.agent.chat(message)
-                return f"{greeting}\n\n{response.response}"
+                self.start_conversation()
             
-            # Regular chat interaction
-            response = self.agent.chat(message)
-            return response.response
+            # Regular chat interaction using direct LLM
+            return self._process_message_with_llm(message)
             
         except Exception as e:
             print(f"⚠️ Agent error: {e}")
@@ -351,16 +592,14 @@ Always maintain your professional yet friendly personality while collecting comp
             
             # Start conversation if needed
             if not self.conversation_started:
-                greeting = self.start_conversation()
-                # Yield greeting first
-                for word in greeting.split():
-                    yield word + " "
-                yield "\n\n"
+                self.start_conversation()
             
-            # Stream the response
-            response = self.agent.stream_chat(message)
-            for token in response.response_gen:
-                yield token
+            # Stream the response using direct LLM
+            agent_response = self._process_message_with_llm(message)
+                
+            # Yield the response word by word to simulate streaming
+            for word in agent_response.split():
+                yield word + " "
                 
         except Exception as e:
             print(f"⚠️ Stream chat error: {e}")
@@ -433,3 +672,16 @@ Tools: {', '.join(available_tools)}
 Ready to help you manage your calendar! 🚀"""
         
         return None
+    
+    def store_meeting_id(self, meeting_id: str, meeting_info: dict):
+        """Store meeting ID and info for cancellation tracking."""
+        self.stored_meetings[meeting_id] = meeting_info
+    
+    def get_stored_meetings(self) -> dict:
+        """Get all stored meeting IDs and info."""
+        return self.stored_meetings.copy()
+    
+    def remove_stored_meeting(self, meeting_id: str):
+        """Remove a stored meeting ID."""
+        if meeting_id in self.stored_meetings:
+            del self.stored_meetings[meeting_id]
