@@ -115,10 +115,8 @@ class ChatCalAgent:
     def _process_message_with_llm(self, message: str) -> str:
         """Process message using direct LLM calls with manual tool invocation."""
         try:
-            print(f"🔍 Debug - Processing message with LLM: '{message[:50]}...'")
             # Check if we need to call any tools based on the message
             tool_result = self._check_and_call_tools(message)
-            print(f"🔍 Debug - Tool result: '{tool_result[:50] if tool_result else 'None'}...')")
             
             # Create enhanced message with tool results if any
             enhanced_message = message
@@ -184,9 +182,6 @@ class ChatCalAgent:
         ]
         
         message_lower = message.lower()
-        print(f"🔍 Debug - Checking tools for message: '{message[:50]}...'")
-        print(f"🔍 Debug - User info complete: {self.has_complete_user_info()}")
-        print(f"🔍 Debug - User info: {self.user_info}")
         
         # Check availability requests
         if any(word in message_lower for word in ["available", "availability", "free", "open"]):
@@ -225,8 +220,6 @@ class ChatCalAgent:
         # Check for booking requests with complete info
         booking_keywords = ["schedule", "book", "appointment", "meeting"]
         has_booking_keyword = any(word in message_lower for word in booking_keywords)
-        print(f"🔍 Debug - Has booking keyword: {has_booking_keyword}")
-        print(f"🔍 Debug - Booking keywords found: {[word for word in booking_keywords if word in message_lower]}")
         
         if self.has_complete_user_info() and has_booking_keyword:
             try:
@@ -794,11 +787,8 @@ class ChatCalAgent:
             if not self.conversation_started:
                 self.start_conversation()
             
-            print(f"🔍 Debug - About to call _process_message_with_llm")
             # Regular chat interaction using direct LLM
-            result = self._process_message_with_llm(message)
-            print(f"🔍 Debug - Result from _process_message_with_llm: '{result[:100] if result else 'None'}...'")
-            return result
+            return self._process_message_with_llm(message)
             
         except Exception as e:
             print(f"⚠️ Agent error: {e}")
