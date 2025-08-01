@@ -2,7 +2,16 @@
 
 ## System Architecture
 
-ChatCal.ai v3.0 is built as a production-ready microservices architecture with the following components:
+ChatCal.ai v4.0 is built as an intelligent conversational AI system with production-ready microservices architecture. The v4.0 update focuses on advanced natural language understanding and user experience improvements:
+
+### V4.0 Intelligence Enhancements:
+- **Smart Time Processing**: Handles "now", "sometime today", past time validation
+- **Contextual Availability**: Shows specific slots instead of generic responses  
+- **Direct Google Meet Integration**: Eliminates artificial security restrictions
+- **Timezone-Aware Processing**: Consistent UTC handling across components
+- **Multi-layer Validation**: Agent-level and tool-level time validation
+
+### Core Architecture:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐

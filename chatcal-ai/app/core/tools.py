@@ -120,6 +120,16 @@ class CalendarTools:
             if not start_time:
                 return "I'm having trouble understanding that date and time. Could you clarify? For example: 'next Tuesday at 2pm'"
             
+            # Check if the proposed time is in the past (with 15-minute grace period)
+            from datetime import datetime, timedelta
+            now = datetime.now(self.calendar_service.default_timezone)
+            grace_period = now - timedelta(minutes=15)
+            
+            if start_time < grace_period:
+                return "Are you trying to trick me, just because I am an AI bot? Not this time! 😏 Please choose a future date and time for your meeting."
+            elif start_time <= now:
+                print(f"🔍 DEBUG: Allowing booking within 15-minute grace period ({start_time})")
+            
             end_time = start_time + timedelta(minutes=duration_minutes)
             
             # Check for conflicts

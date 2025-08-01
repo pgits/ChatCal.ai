@@ -112,11 +112,72 @@ class ChatCalAgent:
         
         return ""
     
+    def _is_booking_confirmation(self, tool_result: str) -> bool:
+        """Check if tool result is a booking confirmation or conflict that should be returned directly."""
+        if not tool_result:
+            return False
+        
+        # Look for indicators of successful booking confirmations
+        success_indicators = [
+            "All set!",
+            "Booked!",
+            "Perfect!",
+            "confirmed",
+            "Meeting ID:",
+            "Duration:",
+            "📧",  # Email status indicators
+            "🎥 Google Meet:",  # Google Meet link
+            "<div style=",  # HTML formatting
+            "background: #e8f5e9",  # Success green background
+            "background: #e3f2fd",  # Success blue background
+            "background: #fff3e0",  # Success orange background
+        ]
+        
+        # Look for conflict/error indicators that should also be returned directly
+        conflict_indicators = [
+            "Oops!",
+            "already have",
+            "conflict",
+            "scheduled at that time",
+            "alternative times",
+            "different slot"
+        ]
+        
+        # If it contains multiple success indicators, it's a formatted confirmation
+        success_count = sum(1 for indicator in success_indicators if indicator in tool_result)
+        found_success = [indicator for indicator in success_indicators if indicator in tool_result]
+        
+        # If it contains conflict indicators, it's a conflict response that should be returned directly
+        has_conflict = any(indicator in tool_result for indicator in conflict_indicators)
+        found_conflicts = [indicator for indicator in conflict_indicators if indicator in tool_result]
+        
+        print(f"🔍 Detection debug - Success indicators found ({success_count}): {found_success}")
+        print(f"🔍 Detection debug - Conflict indicators found: {found_conflicts}")
+        
+        should_return_direct = success_count >= 2 or has_conflict  # Lowered threshold from 3 to 2
+        print(f"🔍 Detection result: {'DIRECT' if should_return_direct else 'PASS_TO_LLM'}")
+        
+        return should_return_direct
+    
     def _process_message_with_llm(self, message: str) -> str:
         """Process message using direct LLM calls with manual tool invocation."""
         try:
             # Check if we need to call any tools based on the message
             tool_result = self._check_and_call_tools(message)
+            print(f"🔍 Tool result received: {bool(tool_result)} (length: {len(tool_result) if tool_result else 0})")
+            
+            # If tool returned a result and it contains HTML formatting or booking indicators,
+            # return it directly without passing through LLM (to preserve HTML formatting)
+            if tool_result:
+                # Check if it's a formatted tool result (contains HTML or booking confirmations)
+                if any(indicator in tool_result for indicator in [
+                    "<div style=", "🎥 Google Meet:", "📧", "Meeting ID:", 
+                    "Oops!", "confirmed", "Booked!", "All set!", "Perfect!"
+                ]):
+                    print(f"🎯 Returning tool result directly (contains formatting/confirmation)")
+                    return tool_result
+                else:
+                    print(f"🔄 Tool result doesn't contain formatting, passing to LLM: {tool_result[:100]}...")
             
             # Create enhanced message with tool results if any
             enhanced_message = message
@@ -218,7 +279,7 @@ class ChatCalAgent:
                     return f"Could not check availability: {str(e)}"
         
         # Check for booking requests with complete info
-        booking_keywords = ["schedule", "book", "appointment", "meeting"]
+        booking_keywords = ["schedule", "book", "appointment", "meeting", "meet", "googlemeet", "zoom", "call"]
         has_booking_keyword = any(word in message_lower for word in booking_keywords)
         
         if self.has_complete_user_info() and has_booking_keyword:
@@ -233,10 +294,28 @@ class ChatCalAgent:
                 date_found = self._extract_date(message_lower)
                 time_found = self._extract_time(message_lower)
                 
-                print(f"📅 Extracted - Date: {date_found}, Time: {time_found}, Duration: {duration}, Type: {meeting_type}")
+                # Special case: if user says "now" but no date, default to "today"
+                if "now" in message_lower and not date_found and time_found:
+                    date_found = "today"
+                    print(f"🔍 DEBUG: 'now' detected without date, defaulting to 'today'")
+                    print(f"🔍 DEBUG: After 'now' fix - date_found='{repr(date_found)}', time_found='{repr(time_found)}'")
                 
-                # If we found both date and time, proceed with booking
+                print(f"🔍 DEBUG: Raw extractions - Date: '{date_found}', Time: '{time_found}'")
+                print(f"📅 Extracted - Date: {date_found}, Time: {time_found}, Duration: {duration}, Type: {meeting_type}")
+                print(f"🔍 DEBUG: Raw values - date_found='{repr(date_found)}', time_found='{repr(time_found)}'")
+                print(f"🔍 DEBUG: Boolean values - date_found: {bool(date_found)}, time_found: {bool(time_found)}")
+                
+                # If we found both date and time, validate it's not in the past
+                print(f"🔍 DEBUG: Checking booking condition - date_found: {bool(date_found)}, time_found: {bool(time_found)}")
                 if date_found and time_found:
+                    # Check if the proposed time is in the past (with 15-minute grace period)
+                    past_result = self._is_time_in_past(date_found, time_found)
+                    if past_result == "too_far_past":
+                        return "Are you trying to trick me, just because I am an AI bot? Not this time! 😏 Please choose a future date and time for your meeting."
+                    elif past_result == "past_but_acceptable":
+                        print(f"🔍 DEBUG: Allowing booking within 15-minute grace period")
+                        # Continue with booking - it's within the grace period
+                    print(f"🔍 DEBUG: Proceeding with booking - date: {date_found}, time: {time_found}")
                     # Find the create appointment tool
                     create_tool = None
                     for tool in self.tools:
@@ -244,29 +323,59 @@ class ChatCalAgent:
                             create_tool = tool
                             break
                     
+                    print(f"🔍 DEBUG: Found create_appointment tool: {bool(create_tool)}")
                     if create_tool:
                         # Create title based on meeting type
                         title = f"{duration}-minute {meeting_type} with Peter Michael Gits"
                         
                         print(f"🔧 Calling create_appointment tool with: title='{title}', date='{date_found}', time='{time_found}', duration={duration}")
                         
-                        # Call the tool with correct parameters
-                        result = create_tool.fn(
-                            title=title,
-                            date_string=date_found,
-                            time_string=time_found,
-                            duration_minutes=duration,
-                            description=f"Meeting with {self.user_info['name']}"
-                        )
+                        try:
+                            # Call the tool with correct parameters
+                            result = create_tool.fn(
+                                title=title,
+                                date_string=date_found,
+                                time_string=time_found,
+                                duration_minutes=duration,
+                                description=f"Meeting with {self.user_info['name']}"
+                            )
+                            print(f"🔍 DEBUG: Tool call completed successfully")
+                        except Exception as tool_error:
+                            print(f"❌ DEBUG: Tool call failed with error: {tool_error}")
+                            return f"I encountered an error while booking: {str(tool_error)}"
                         
                         print(f"✅ Tool result: {result[:100]}...")
+                        print(f"🔍 DEBUG: About to return tool result from _check_and_call_tools")
                         return result
                     else:
                         print("❌ Could not find create_appointment tool")
                         return "I'm having trouble accessing the calendar system right now. Please try again in a moment."
+                elif date_found and not time_found:
+                    # User specified a date but no specific time - check availability
+                    print(f"📅 Date specified but no time - checking availability for {date_found}")
+                    
+                    # Find the check availability tool
+                    availability_tool = None
+                    for tool in self.tools:
+                        if "check_availability" in tool.metadata.name:
+                            availability_tool = tool
+                            break
+                    
+                    if availability_tool:
+                        try:
+                            result = availability_tool.call(date_string=date_found, duration_minutes=duration)
+                            print(f"✅ Availability result: {result[:100]}...")
+                            return result
+                        except Exception as e:
+                            print(f"❌ Availability check failed: {e}")
+                            return f"I'm having trouble checking Peter's calendar for {date_found}. Could you try specifying a time, or try again?"
+                    else:
+                        print("❌ Could not find availability tool")
+                        return "I'm having trouble accessing the calendar system. Could you specify a preferred time?"
                 else:
-                    print(f"⚠️ Missing booking details - Date: {date_found}, Time: {time_found}")
-                    # If date/time not found, let the LLM handle the conversation naturally
+                    print(f"⚠️ Missing booking details - Date: '{repr(date_found)}', Time: '{repr(time_found)}'")
+                    print(f"🔍 DEBUG: Condition failed - date_found exists: {bool(date_found)}, time_found exists: {bool(time_found)}")
+                    # If neither date nor time found, let the LLM handle the conversation naturally
                     return ""
                     
             except Exception as e:
@@ -575,7 +684,7 @@ class ChatCalAgent:
             r"\d{1,2}:\d{2}\s*(?:am|pm)",
             r"\d{1,2}\s*(?:am|pm)",
             r"\d{1,2}:\d{2}",
-            r"morning|afternoon|evening|noon"
+            r"morning|afternoon|evening|noon|now"
         ]
         
         for pattern in time_patterns:
@@ -591,9 +700,150 @@ class ChatCalAgent:
                     return "6:00 PM"
                 elif time_str == "noon":
                     return "12:00 PM"
+                elif time_str == "now":
+                    # Get current time (round to next 15 minutes for practical scheduling)
+                    from datetime import datetime, timedelta
+                    current_time = datetime.now()
+                    # Round up to next 15-minute interval
+                    minutes = (current_time.minute // 15 + 1) * 15
+                    if minutes >= 60:
+                        current_time = current_time.replace(hour=current_time.hour + 1, minute=0)
+                    else:
+                        current_time = current_time.replace(minute=minutes)
+                    return current_time.strftime("%I:%M %p").lstrip('0')  # e.g., "2:30 PM"
                 return time_str
         
         return None
+    
+    def _is_time_in_past(self, date_string: str, time_string: str) -> str:
+        """Check if the proposed date/time is in the past.
+        
+        Returns:
+            'future' - Time is in the future (OK to book)
+            'past_but_acceptable' - Within 15-minute grace period (OK to book)
+            'too_far_past' - More than 15 minutes in the past (reject with playful message)
+        """
+        try:
+            from datetime import datetime, timedelta
+            import re
+            import pytz
+            from app.config import settings
+            
+            # Use the same timezone as the calendar service
+            default_timezone = pytz.timezone(settings.default_timezone)
+            now = datetime.now(default_timezone)
+            
+            # Parse the date
+            proposed_date = None
+            if date_string.lower() == "today":
+                proposed_date = now.date()
+            elif date_string.lower() == "tomorrow":
+                proposed_date = (now + timedelta(days=1)).date()
+            elif date_string.lower() in ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]:
+                # Find next occurrence of this weekday
+                weekdays = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+                target_weekday = weekdays.index(date_string.lower())
+                days_ahead = target_weekday - now.weekday()
+                if days_ahead <= 0:  # Target day already happened this week
+                    days_ahead += 7
+                proposed_date = (now + timedelta(days=days_ahead)).date()
+            elif "next" in date_string.lower():
+                # Handle "next monday", "next week", etc.
+                if "week" in date_string.lower():
+                    proposed_date = (now + timedelta(days=7)).date()
+                else:
+                    # Extract weekday from "next monday"
+                    for day in ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]:
+                        if day in date_string.lower():
+                            weekdays = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+                            target_weekday = weekdays.index(day)
+                            days_ahead = target_weekday - now.weekday() + 7  # Next week
+                            proposed_date = (now + timedelta(days=days_ahead)).date()
+                            break
+            else:
+                # For other date formats, assume it's in the future (safety)
+                return 'future'
+            
+            if not proposed_date:
+                return 'future'
+                
+            # Parse the time
+            time_str = time_string.lower().strip()
+            
+            # Convert time to 24-hour format for comparison
+            hour = 0
+            minute = 0
+            
+            # Handle specific time formats
+            if ":" in time_str:
+                time_match = re.match(r'(\d{1,2}):(\d{2})\s*(am|pm)?', time_str)
+                if time_match:
+                    hour = int(time_match.group(1))
+                    minute = int(time_match.group(2))
+                    ampm = time_match.group(3)
+                    
+                    if ampm == "pm" and hour != 12:
+                        hour += 12
+                    elif ampm == "am" and hour == 12:
+                        hour = 0
+            else:
+                # Handle formats like "3 pm", "morning", etc.
+                if "pm" in time_str:
+                    time_match = re.match(r'(\d{1,2})\s*pm', time_str)
+                    if time_match:
+                        hour = int(time_match.group(1))
+                        if hour != 12:
+                            hour += 12
+                elif "am" in time_str:
+                    time_match = re.match(r'(\d{1,2})\s*am', time_str)
+                    if time_match:
+                        hour = int(time_match.group(1))
+                        if hour == 12:
+                            hour = 0
+                elif time_str == "morning":
+                    hour = 9
+                elif time_str == "afternoon":
+                    hour = 14
+                elif time_str == "evening":
+                    hour = 18
+                elif time_str == "noon":
+                    hour = 12
+                elif time_str == "now":
+                    # For "now", use current time (no rounding needed for validation)
+                    current_time = now
+                    hour = current_time.hour
+                    minute = current_time.minute
+                else:
+                    # Unknown time format, assume future
+                    return 'future'
+            
+            # Create proposed datetime in the same timezone as 'now'
+            naive_datetime = datetime.combine(proposed_date, datetime.min.time().replace(hour=hour, minute=minute))
+            proposed_datetime = default_timezone.localize(naive_datetime)
+            
+            # Calculate time difference
+            time_diff = proposed_datetime - now
+            print(f"🔍 DEBUG: Time calculation - now={now}, proposed={proposed_datetime}")
+            print(f"🔍 DEBUG: Raw time_diff={time_diff}, total_seconds={time_diff.total_seconds()}")
+            
+            if time_diff.total_seconds() > 0:
+                # Future time - always OK
+                print(f"🔍 DEBUG: Future time detected")
+                return 'future'
+            elif time_diff.total_seconds() >= -900:  # Within 15 minutes in the past (-900 seconds)
+                minutes_past = abs(time_diff.total_seconds()) / 60
+                print(f"🔍 DEBUG: Time validation - {proposed_datetime} is {minutes_past:.1f} minutes in the past (within grace period)")
+                return 'past_but_acceptable'
+            else:
+                # More than 15 minutes in the past
+                minutes_past = abs(time_diff.total_seconds()) / 60
+                print(f"🔍 DEBUG: Time validation - {proposed_datetime} is {minutes_past:.1f} minutes in the past (too far past)")
+                return 'too_far_past'
+            
+        except Exception as e:
+            print(f"⚠️ Error validating time: {e}")
+            # If we can't parse it, assume it's valid to avoid blocking legitimate requests
+            return 'future'
     
     def _extract_duration(self, message_lower: str) -> int:
         """Extract duration from message in minutes."""

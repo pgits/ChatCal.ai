@@ -111,9 +111,16 @@ class CalendarService:
         # Find available slots
         available_slots = []
         current_time = start_time
+        now = datetime.now(self.default_timezone)
         
         while current_time + timedelta(minutes=duration_minutes) <= end_time:
             slot_end = current_time + timedelta(minutes=duration_minutes)
+            
+            # Skip slots that are in the past (with 10-minute buffer)
+            buffer_time = now + timedelta(minutes=10)
+            if current_time <= buffer_time:
+                current_time += timedelta(minutes=interval_minutes)
+                continue
             
             # Check if this slot conflicts with any busy time
             is_available = True

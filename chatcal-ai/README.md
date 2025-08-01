@@ -10,15 +10,17 @@ An intelligent AI scheduling assistant powered by Groq's Llama-3.1-8b-instant an
 - 🎨 **Rich HTML Interfaces**: Beautiful chat widget and simple chat interfaces
 - 📧 **Full Email Integration**: Gmail SMTP with calendar invitations (.ics attachments)
 - 🔧 **Intelligent Tool Invocation**: Automatic booking from natural language
-- 🎥 **Google Meet Integration**: Automatic video conference setup for remote meetings
+- 🎥 **Google Meet Integration**: Automatic video conference setup with clickable links
 - 🗑️ **Smart Cancellation**: Intelligent meeting matching with email notifications
 - 🆔 **Custom Meeting IDs**: Human-readable meeting IDs (MMDD-HHMM-DURm format)
-- 📝 **Natural Language Processing**: Extract dates, times, durations from conversation
+- 📝 **Advanced NLP**: Extract dates, times, durations, handles "now" and relative times
+- ⏰ **Smart Time Validation**: 15-minute grace period for past bookings with friendly responses
 - 🎯 **Multiple Interfaces**: Chat widget, simple chat, and embeddable options
 - 🚀 **Production Ready**: Docker deployment with comprehensive error handling
 - 🧪 **Testing Mode**: Configurable testing environment for development
 - 🔒 **Secure Authentication**: OAuth2 for Google Calendar access
-- 🌍 **Timezone-aware**: Smart scheduling across time zones
+- 🌍 **Timezone-aware**: Smart scheduling across time zones with UTC consistency
+- 📊 **Intelligent Availability**: Shows specific time slots when date but no time specified
 
 ## Prerequisites
 
@@ -174,10 +176,29 @@ I'm John Smith (john@company.com). Can we schedule a 45-minute Google Meet
 consultation with Peter next Tuesday at 10 AM?
 ```
 
+### Flexible Time Requests
+```
+My name is Betty, need a GoogleMeet for 20 minutes sometime today. 
+My email is pgits.geekgaps@gmail.com, topic is "faster AI".
+```
+**Response**: Shows specific available time slots instead of generic messages.
+
+### "Now" Scheduling
+```
+Hi! I'm Now Test, book a 30-minute Google Meet with Peter now.
+```
+**Response**: Automatically rounds to next practical time slot.
+
+### Past Time Validation
+```
+Book a meeting with Peter today at 10:00 AM (when it's currently 2:00 PM)
+```
+**Response**: "Are you trying to trick me, just because I am an AI bot? Not this time! 😏"
+
 ### Quick Booking (Widget)
 Use the quick action buttons:
-- 🎥 **Google Meet** - Instant video meeting setup
-- 📅 **Check availability** - View Peter's schedule
+- 🎥 **Google Meet** - Instant video meeting setup with clickable links
+- 📅 **Check availability** - View Peter's schedule  
 - 🤝 **In-person meeting** - Schedule face-to-face meetings
 
 ## API Endpoints

@@ -2,7 +2,16 @@
 
 ## Overview
 
-ChatCal.ai v3.0 is production-ready with comprehensive email integration, conversation memory, and robust error handling. This guide covers deployment to various platforms.
+ChatCal.ai v4.0 is production-ready with advanced conversational AI intelligence, comprehensive email integration, and robust error handling. The v4.0 update includes significant user experience improvements:
+
+### V4.0 Production Features:
+- **Smart Time Intelligence**: "now" scheduling, past time validation with 15-minute grace period
+- **Enhanced Availability**: Shows specific time slots instead of "awaiting confirmation"
+- **Direct Google Meet Links**: No artificial security restrictions
+- **Timezone Consistency**: UTC-aware processing across all components
+- **Improved Error Handling**: User-friendly messages with personality
+
+This guide covers deployment to various platforms.
 
 ## Quick Production Checklist
 
