@@ -4,7 +4,7 @@ from typing import List, Optional
 from llama_index.core.llms import ChatMessage, MessageRole, ChatResponse, CompletionResponse
 from llama_index.core.llms.llm import LLM
 from llama_index.core.llms.callbacks import llm_completion_callback
-from app.personality.prompts import GREETING_TEMPLATES, BOOKING_CONFIRMATIONS, ENCOURAGEMENT_PHRASES
+from app.personality.prompts import BOOKING_CONFIRMATIONS, ENCOURAGEMENT_PHRASES
 import random
 import re
 
@@ -51,7 +51,12 @@ class MockAnthropicLLM(LLM):
         
         # Greeting
         elif any(word in prompt_lower for word in ["hi", "hello", "hey"]):
-            return random.choice(GREETING_TEMPLATES)
+            greetings = [
+                "Hello! I'm ChatCal, your friendly scheduling assistant. How can I help you book time with Peter today?",
+                "Hi there! Ready to schedule some time with Peter? I'm here to make it super easy!",
+                "Hey! I'd love to help you book an appointment with Peter. What works for your schedule?"
+            ]
+            return random.choice(greetings)
         
         # Default helpful response
         else:
