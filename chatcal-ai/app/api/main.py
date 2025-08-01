@@ -135,7 +135,7 @@ async def root():
             </p>
             
             <div style="text-align: center; margin: 30px 0;">
-                <a href="/simple-chat" style="background: #4caf50; color: white; padding: 15px 40px; font-size: 20px; border-radius: 8px; text-decoration: none; display: inline-block;">
+                <a href="/chat-widget" style="background: #4caf50; color: white; padding: 15px 40px; font-size: 20px; border-radius: 8px; text-decoration: none; display: inline-block;">
                     Book an Appointment Now
                 </a>
             </div>
