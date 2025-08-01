@@ -493,6 +493,71 @@ class CalendarTools:
         except Exception as e:
             return f"I'm having trouble cancelling that meeting. Could you try again? (Error: {str(e)})"
     
+    def find_user_meetings(self, user_name: str, days_ahead: int = 30) -> str:
+        """
+        Find all meetings for a specific user within the next specified days.
+        
+        Args:
+            user_name: Name of the person who booked meetings
+            days_ahead: Number of days to look ahead (default: 30)
+        
+        Returns:
+            List of meetings for the user or message if none found
+        """
+        try:
+            # Search for meetings in the next specified days
+            now = datetime.now(self.calendar_service.default_timezone)
+            search_end = now + timedelta(days=days_ahead)
+            
+            events = self.calendar_service.list_events(
+                time_min=now,
+                time_max=search_end,
+                max_results=50
+            )
+            
+            # Find meetings that match the user name
+            matching_events = []
+            for event in events:
+                event_summary = event.get('summary', '').lower()
+                event_description = event.get('description', '').lower()
+                
+                # Check if user name appears in title or description
+                if (user_name.lower() in event_summary or 
+                    user_name.lower() in event_description or
+                    f"meeting with {user_name.lower()}" in event_summary):
+                    matching_events.append(event)
+            
+            if not matching_events:
+                return f"I couldn't find any upcoming meetings for {user_name} in the next {days_ahead} days."
+            
+            # Format the meetings for display
+            meetings_list = []
+            for i, event in enumerate(matching_events[:5], 1):  # Limit to 5 meetings
+                event_time = datetime.fromisoformat(event['start']['dateTime'].replace('Z', '+00:00'))
+                formatted_time = self.formatter.format_datetime(event_time)
+                event_title = event.get('summary', 'Meeting')
+                
+                # Find custom meeting ID if available
+                custom_id = "N/A"
+                if self.agent:
+                    stored_meetings = self.agent.get_stored_meetings()
+                    for stored_id, info in stored_meetings.items():
+                        if info.get('google_id') == event.get('id'):
+                            custom_id = stored_id
+                            break
+                
+                meetings_list.append(f"**{i}. {event_title}**<br>{formatted_time}<br><em>ID: {custom_id}</em>")
+            
+            meetings_text = "<br><br>".join(meetings_list)
+            return f"""<div style="background: #fff3e0; padding: 15px; border-radius: 8px; border-left: 4px solid #ff9800; margin: 10px 0;">
+            <strong>🔍 Found {len(matching_events)} meeting{'s' if len(matching_events) != 1 else ''} for {user_name}:</strong><br><br>
+            {meetings_text}<br><br>
+            Which one would you like to cancel? You can say "cancel #1" or "cancel the first one".
+            </div>"""
+            
+        except Exception as e:
+            return f"I'm having trouble finding meetings for {user_name}. Error: {str(e)}"
+
     def cancel_meeting_by_details(self, user_name: str, date_string: str, time_string: str = None) -> str:
         """
         Cancel a meeting by user name and date/time.
@@ -730,6 +795,11 @@ class CalendarTools:
                 description="Reschedule an existing appointment to a new date/time. Use this when users want to move or change an existing meeting."
             ),
             FunctionTool.from_defaults(
+                fn=self.find_user_meetings,
+                name="find_user_meetings",
+                description="Find all meetings for a specific user. Use this when users want to cancel but don't remember the specific time/date details. This will show them their meetings to choose from."
+            ),
+            FunctionTool.from_defaults(
                 fn=self.cancel_meeting_by_id,
                 name="cancel_meeting_by_id",
                 description="Cancel a meeting using its meeting ID. Use this when users provide a meeting ID to cancel."
@@ -737,6 +807,6 @@ class CalendarTools:
             FunctionTool.from_defaults(
                 fn=self.cancel_meeting_by_details,
                 name="cancel_meeting_by_details", 
-                description="Cancel a meeting by user name and date/time. Use this when users want to cancel but don't have the meeting ID."
+                description="Cancel a meeting by user name and date/time. Use this when users want to cancel and they remember the specific date/time."
             )
         ]

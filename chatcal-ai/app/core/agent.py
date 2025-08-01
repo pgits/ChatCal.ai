@@ -314,6 +314,96 @@ class ChatCalAgent:
                 print(f"❌ Cleared conversation state after cancellation error: {str(e)}")
                 return f"Could not cancel meeting: {str(e)}"
         
+        # Check for numbered cancellation requests (e.g., "cancel #1", "cancel the first one")
+        elif any(word in message_lower for word in ["cancel", "delete", "remove"]):
+            # Look for number indicators
+            number_patterns = [
+                r"#(\d+)", r"number (\d+)", r"(\d+)(?:st|nd|rd|th)?",
+                r"first", r"second", r"third", r"fourth", r"fifth"
+            ]
+            
+            number_words = {"first": 1, "second": 2, "third": 3, "fourth": 4, "fifth": 5}
+            selected_number = None
+            
+            for pattern in number_patterns:
+                match = re.search(pattern, message_lower)
+                if match:
+                    if match.group().strip() in number_words:
+                        selected_number = number_words[match.group().strip()]
+                    else:
+                        try:
+                            selected_number = int(match.group(1) if match.groups() else match.group().strip("#"))
+                        except:
+                            continue
+                    break
+            
+            # If user selected a number and we have their stored meetings info, try to cancel by selection
+            if selected_number and self.user_info.get('name'):
+                # Find their meetings to get the selected one
+                try:
+                    find_tool = None
+                    for tool in self.tools:
+                        if "find_user_meetings" in tool.metadata.name.lower():
+                            find_tool = tool
+                            break
+                    
+                    if find_tool:
+                        # This is a bit of a workaround - we'll get their meetings and extract the nth one
+                        from datetime import datetime, timedelta
+                        now = datetime.now(self.calendar_tools.calendar_service.default_timezone)
+                        search_end = now + timedelta(days=30)
+                        
+                        events = self.calendar_tools.calendar_service.list_events(
+                            time_min=now,
+                            time_max=search_end,
+                            max_results=50
+                        )
+                        
+                        # Find meetings that match the user name
+                        matching_events = []
+                        for event in events:
+                            event_summary = event.get('summary', '').lower()
+                            event_description = event.get('description', '').lower()
+                            
+                            if (self.user_info['name'].lower() in event_summary or 
+                                self.user_info['name'].lower() in event_description or
+                                f"meeting with {self.user_info['name'].lower()}" in event_summary):
+                                matching_events.append(event)
+                        
+                        if matching_events and 1 <= selected_number <= len(matching_events):
+                            # Cancel the selected meeting
+                            selected_event = matching_events[selected_number - 1]
+                            google_meeting_id = selected_event.get('id')
+                            
+                            # Try to find custom meeting ID
+                            custom_meeting_id = None
+                            if self.agent:
+                                stored_meetings = self.agent.get_stored_meetings()
+                                for stored_id, info in stored_meetings.items():
+                                    if info.get('google_id') == google_meeting_id:
+                                        custom_meeting_id = stored_id
+                                        break
+                            
+                            # Cancel using the meeting ID
+                            cancel_tool = None
+                            for tool in self.tools:
+                                if "cancel" in tool.metadata.name.lower() and "id" in tool.metadata.name.lower():
+                                    cancel_tool = tool
+                                    break
+                            
+                            if cancel_tool:
+                                if custom_meeting_id:
+                                    result = cancel_tool.call(meeting_id=custom_meeting_id)
+                                else:
+                                    # Fall back to Google ID
+                                    result = cancel_tool.call(meeting_id=google_meeting_id)
+                                return result
+                        else:
+                            return f"I couldn't find meeting #{selected_number}. Please check the list and try again."
+                            
+                except Exception as e:
+                    return f"Could not cancel meeting: {str(e)}"
+        
         # Check for new cancellation requests
         elif any(word in message_lower for word in ["cancel", "delete", "remove"]) and any(word in message_lower for word in ["meeting", "appointment"]):
             # Look for meeting ID in message first
@@ -367,7 +457,16 @@ class ChatCalAgent:
                                 time_found = match.group()
                                 break
                         
-                        if date_found:
+                        # Check if user indicates they don't remember the time
+                        no_time_indicators = [
+                            "don't remember", "can't remember", "forgot", "not sure when",
+                            "don't know when", "what time", "which one", "don't recall"
+                        ]
+                        
+                        user_doesnt_remember = any(indicator in message_lower for indicator in no_time_indicators)
+                        
+                        if date_found and not user_doesnt_remember:
+                            # User provided specific date/time - use details cancellation
                             cancel_tool = None
                             for tool in self.tools:
                                 if "cancel" in tool.metadata.name.lower() and "details" in tool.metadata.name.lower():
@@ -397,6 +496,17 @@ class ChatCalAgent:
                                     print(f"🔄 Set conversation state: awaiting cancellation clarification for {self.user_info['name']}")
                                 
                                 return result  # Return direct result (already formatted HTML)
+                        else:
+                            # User doesn't remember time or didn't provide date - show all their meetings
+                            find_tool = None
+                            for tool in self.tools:
+                                if "find_user_meetings" in tool.metadata.name.lower():
+                                    find_tool = tool
+                                    break
+                            
+                            if find_tool:
+                                result = find_tool.call(user_name=self.user_info['name'])
+                                return result  # Return list of meetings for user to choose
                     except Exception as e:
                         return f"Could not cancel meeting: {str(e)}"
         

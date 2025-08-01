@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Widget</title>
+</head>
+<body>
+    <div>
+        <input type="text" id="messageInput" placeholder="Type message..." />
+        <button onclick="testSend()">Send</button>
+    </div>
+    <div id="messages"></div>
+
+    <script>
+        function testSend() {
+            console.log('Button clicked!');
+            const input = document.getElementById('messageInput');
+            const messages = document.getElementById('messages');
+            
+            console.log('Input value:', input.value);
+            
+            if (input.value.trim()) {
+                messages.innerHTML += '<p>You: ' + input.value + '</p>';
+                
+                // Test API call
+                fetch('http://localhost:8002/sessions', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({user_data: {}})
+                })
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Session created:', data);
+                    
+                    // Now send chat message
+                    return fetch('http://localhost:8002/chat', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({
+                            message: input.value,
+                            session_id: data.session_id
+                        })
+                    });
+                })
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Chat response:', data);
+                    messages.innerHTML += '<p>Bot: ' + data.response + '</p>';
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    messages.innerHTML += '<p>Error: ' + error + '</p>';
+                });
+                
+                input.value = '';
+            }
+        }
+        
+        document.getElementById('messageInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                testSend();
+            }
+        });
+    </script>
+</body>
+</html>

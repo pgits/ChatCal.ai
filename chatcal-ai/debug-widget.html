@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Widget</title>
+</head>
+<body>
+    <h1>Debug Test</h1>
+    <input type="text" id="messageInput" placeholder="Type message..." value="hello">
+    <button onclick="alert('Button works!'); testFunction();">Test Button</button>
+    <div id="output"></div>
+
+    <script>
+        function testFunction() {
+            console.log('testFunction called');
+            const input = document.getElementById('messageInput');
+            const output = document.getElementById('output');
+            output.innerHTML = 'Input value: ' + input.value;
+            
+            // Try to call the API
+            fetch('http://localhost:8002/sessions', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({user_data: {}})
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('API response:', data);
+                output.innerHTML += '<br>Session: ' + data.session_id;
+            })
+            .catch(error => {
+                console.error('API error:', error);
+                output.innerHTML += '<br>Error: ' + error;
+            });
+        }
+    </script>
+</body>
+</html>

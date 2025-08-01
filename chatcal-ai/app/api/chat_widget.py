@@ -301,7 +301,7 @@ async def chat_widget(request: Request):
                     placeholder="Ask me to schedule a meeting, check availability, or manage your calendar..."
                     maxlength="1000"
                 />
-                <button id="sendButton" onclick="sendMessage()">
+                <button id="sendButton" type="button">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
                     </svg>
@@ -318,6 +318,7 @@ async def chat_widget(request: Request):
             const sendButton = document.getElementById('sendButton');
             const typingIndicator = document.getElementById('typingIndicator');
             
+            
             // Initialize session
             async function initializeSession() {{
                 try {{
@@ -332,7 +333,6 @@ async def chat_widget(request: Request):
                     if (response.ok) {{
                         const data = await response.json();
                         sessionId = data.session_id;
-                        console.log('Session initialized:', sessionId);
                     }}
                 }} catch (error) {{
                     console.error('Failed to initialize session:', error);
@@ -359,23 +359,39 @@ async def chat_widget(request: Request):
                 messageDiv.appendChild(avatar);
                 messageDiv.appendChild(messageContent);
                 
-                // Insert before typing indicator
-                chatMessages.insertBefore(messageDiv, typingIndicator);
+                // Simply append to chatMessages instead of insertBefore
+                chatMessages.appendChild(messageDiv);
                 chatMessages.scrollTop = chatMessages.scrollHeight;
             }}
             
             function showTyping() {{
-                typingIndicator.style.display = 'block';
+                if (typingIndicator) {{
+                    typingIndicator.style.display = 'block';
+                }}
                 chatMessages.scrollTop = chatMessages.scrollHeight;
             }}
             
             function hideTyping() {{
-                typingIndicator.style.display = 'none';
+                if (typingIndicator) {{
+                    typingIndicator.style.display = 'none';
+                }}
             }}
             
             async function sendMessage(message = null) {{
                 const text = message || messageInput.value.trim();
-                if (!text || isLoading) return;
+                
+                if (!text || isLoading) {{
+                    return;
+                }}
+                
+                // Ensure we have a session before sending
+                if (!sessionId) {{
+                    await initializeSession();
+                    if (!sessionId) {{
+                        addMessage('Sorry, I had trouble connecting. Please try again!');
+                        return;
+                    }}
+                }}
                 
                 // Add user message
                 addMessage(text, true);
@@ -429,8 +445,17 @@ async def chat_widget(request: Request):
                 }}
             }});
             
+            // Add click listener to send button
+            if (sendButton) {{
+                sendButton.addEventListener('click', function(e) {{
+                    e.preventDefault();
+                    sendMessage();
+                }});
+            }}
+            
             // Initialize when page loads
             window.addEventListener('load', initializeSession);
+            
         </script>
     </body>
     </html>
