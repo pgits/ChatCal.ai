@@ -7,13 +7,16 @@ An intelligent AI scheduling assistant powered by Groq's Llama-3.1-8b-instant an
 - 🤖 **Groq-powered LLM**: Fast, efficient conversation using Llama-3.1-8b-instant
 - 📅 **Smart Calendar Integration**: Seamless Google Calendar booking with conflict detection
 - 🧠 **Conversation Memory**: Persistent context across multi-turn conversations
-- 🎨 **HTML-formatted Responses**: Rich, styled responses for better readability
-- 🆔 **Custom Meeting IDs**: Human-readable meeting IDs (MMDD-HHMM-DURm format)
-- 🗑️ **Smart Cancellation**: Intelligent meeting matching with automatic email notifications
+- 🎨 **Rich HTML Interfaces**: Beautiful chat widget and simple chat interfaces
+- 📧 **Full Email Integration**: Gmail SMTP with calendar invitations (.ics attachments)
+- 🔧 **Intelligent Tool Invocation**: Automatic booking from natural language
 - 🎥 **Google Meet Integration**: Automatic video conference setup for remote meetings
-- 📧 **Email Notifications**: Automated booking confirmations and cancellation notices
+- 🗑️ **Smart Cancellation**: Intelligent meeting matching with email notifications
+- 🆔 **Custom Meeting IDs**: Human-readable meeting IDs (MMDD-HHMM-DURm format)
+- 📝 **Natural Language Processing**: Extract dates, times, durations from conversation
+- 🎯 **Multiple Interfaces**: Chat widget, simple chat, and embeddable options
+- 🚀 **Production Ready**: Docker deployment with comprehensive error handling
 - 🧪 **Testing Mode**: Configurable testing environment for development
-- 🚀 **FastAPI Backend**: High-performance API with Redis session management
 - 🔒 **Secure Authentication**: OAuth2 for Google Calendar access
 - 🌍 **Timezone-aware**: Smart scheduling across time zones
 
@@ -80,8 +83,10 @@ docker-compose down
 ```
 
 The application will be available at:
-- API: http://localhost:8000
-- API Docs: http://localhost:8000/docs
+- **Chat Widget** (Recommended): http://localhost:8000/chat-widget
+- **Simple Chat**: http://localhost:8000/simple-chat
+- **API Documentation**: http://localhost:8000/docs
+- **Health Check**: http://localhost:8000/health
 
 ### 5. Development Setup (without Docker)
 
@@ -114,6 +119,66 @@ chatcal-ai/
 ├── credentials/     # Google credentials (gitignored)
 └── docker-compose.yml
 ```
+
+## User Interfaces
+
+### Chat Widget (Recommended)
+**URL**: http://localhost:8000/chat-widget
+
+The premium interface featuring:
+- **Modern Design**: Beautiful gradient backgrounds and professional styling
+- **Quick Actions**: Pre-built buttons for Google Meet, availability checks, etc.
+- **Rich Formatting**: HTML-rendered responses with color coding
+- **Responsive Layout**: Works on desktop and mobile devices
+- **Interactive Elements**: Typing indicators, smooth animations
+- **Embeddable**: Can be integrated into other websites
+
+### Simple Chat Interface  
+**URL**: http://localhost:8000/simple-chat
+
+A clean, functional interface for basic interactions:
+- **Fast Loading**: Minimal overhead for quick access
+- **Full Functionality**: All booking features available
+- **Text-focused**: Simple input/output format
+- **Development Friendly**: Easy debugging and testing
+
+## Email Integration
+
+### Automatic Email Invitations
+- **Gmail SMTP**: Configured with app-specific password
+- **Dual Recipients**: Both user and Peter receive invitations
+- **Calendar Attachments**: .ics files for easy calendar import
+- **HTML Formatting**: Beautiful, professional email templates
+- **Meeting Details**: Complete information including Google Meet links
+
+### Email Configuration
+```bash
+# Required environment variables
+SMTP_SERVER=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USERNAME=your-email@gmail.com
+SMTP_PASSWORD=your-gmail-app-password
+```
+
+## Usage Examples
+
+### Basic Booking
+```
+Hi! I'm Sarah Johnson, email sarah@example.com, phone 555-123-4567.
+Please book a 30-minute meeting with Peter tomorrow at 2 PM.
+```
+
+### Google Meet Booking  
+```
+I'm John Smith (john@company.com). Can we schedule a 45-minute Google Meet 
+consultation with Peter next Tuesday at 10 AM?
+```
+
+### Quick Booking (Widget)
+Use the quick action buttons:
+- 🎥 **Google Meet** - Instant video meeting setup
+- 📅 **Check availability** - View Peter's schedule
+- 🤝 **In-person meeting** - Schedule face-to-face meetings
 
 ## API Endpoints
 
