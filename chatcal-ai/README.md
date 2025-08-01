@@ -21,7 +21,7 @@ An intelligent AI scheduling assistant powered by Groq's Llama-3.1-8b-instant an
 
 - Python 3.11+
 - Docker and Docker Compose
-- Groq API key (primary LLM)
+- Groq API key (get free key at https://console.groq.com/keys)
 - Anthropic API key (optional fallback)
 - Google Cloud Project with Calendar API enabled
 - Google OAuth2 credentials
@@ -41,7 +41,7 @@ cp .env.example .env
 ```
 
 Edit `.env` with your credentials:
-- `GROQ_API_KEY`: Your Groq API key (primary)
+- `GROQ_API_KEY`: Your Groq API key (get free key at https://console.groq.com/keys)
 - `ANTHROPIC_API_KEY`: Your Anthropic API key (optional fallback)
 - `GOOGLE_CLIENT_ID` & `GOOGLE_CLIENT_SECRET`: From Google Cloud Console
 - `SECRET_KEY`: Generate a secure secret key
@@ -176,6 +176,31 @@ Add the chat widget to any webpage:
 - Google Meet link generation and embedding
 - Support for both in-person and remote meetings
 
+## LLM Configuration
+
+### Groq Integration (Primary)
+
+The application uses Groq's `Llama-3.1-8b-instant` model for fast, efficient AI responses:
+
+- **Model**: Llama-3.1-8b-instant (high-performance open-source model)
+- **API Key**: Required (get free key at https://console.groq.com/keys)
+- **Fallback Chain**: Groq → Anthropic → Mock LLM
+- **Speed**: Extremely fast inference with low latency
+
+### HuggingFace Integration (Commented Out)
+
+The application has HuggingFace integration code available but commented out due to API access issues:
+- **Status**: Disabled until HuggingFace Inference API issues are resolved
+- **Model**: Qwen/Qwen2.5-7B-Instruct (available when enabled)
+- **Code Location**: See commented sections in `app/core/llm_anthropic.py`
+
+### LLM Fallback Chain
+
+The application implements a robust fallback system:
+1. **Primary**: Groq Llama-3.1-8b-instant
+2. **Fallback**: Anthropic Claude-3-Sonnet (if Groq fails)
+3. **Final Fallback**: Mock LLM (for testing/development)
+
 ## Configuration
 
 See `app/config.py` for all available settings. Key configurations:
@@ -184,6 +209,8 @@ See `app/config.py` for all available settings. Key configurations:
 - `SESSION_TIMEOUT_MINUTES`: Session expiration time
 - `DEFAULT_TIMEZONE`: Default timezone for appointments
 - `TESTING_MODE`: Enable/disable testing features
+- `GROQ_API_KEY`: Groq API key for LLM access
+- `ANTHROPIC_API_KEY`: Optional Anthropic API key for fallback
 
 ## Testing
 

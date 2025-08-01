@@ -15,12 +15,27 @@ except ImportError:
     GROQ_AVAILABLE = False
     print("⚠️ Groq LLM not available - falling back to Anthropic")
 
+# HuggingFace support (commented out until API issues resolved)
+# try:
+#     from llama_index.llms.huggingface import HuggingFaceInferenceAPI
+#     HUGGINGFACE_AVAILABLE = True
+# except ImportError:
+#     try:
+#         from llama_index.llms.huggingface_api import HuggingFaceInferenceAPI
+#         HUGGINGFACE_AVAILABLE = True
+#     except ImportError:
+#         HUGGINGFACE_AVAILABLE = False
+#         print("⚠️ HuggingFace LLM not available")
+HUGGINGFACE_AVAILABLE = False  # Disabled until API issues resolved
+
 
 class AnthropicLLM:
     """Manages the Groq LLM integration with LlamaIndex (keeping AnthropicLLM name for compatibility)."""
     
     def __init__(self):
-        self.api_key = settings.groq_api_key  # Use GROQ_API_KEY instead
+        self.api_key = settings.groq_api_key  # Use GROQ_API_KEY 
+        # self.api_token = settings.huggingface_api_token  # Disabled until API issues resolved
+        # self.model_name = settings.huggingface_model_name  # Disabled until API issues resolved
         self.llm = None
         self._initialize_llm()
     
@@ -45,6 +60,17 @@ class AnthropicLLM:
                     system_prompt=SYSTEM_PROMPT
                 )
                 print("🔧 Using Groq Llama-3.1-8b-instant LLM")
+            # HuggingFace support (commented out until API issues resolved)
+            # elif HUGGINGFACE_AVAILABLE and self.api_token:
+            #     print(f"🔧 Using HuggingFace {self.model_name} with API token")
+            #     self.llm = HuggingFaceInferenceAPI(
+            #         model_name=self.model_name,
+            #         token=self.api_token,
+            #         max_new_tokens=4096,
+            #         temperature=0.7,
+            #         system_prompt=SYSTEM_PROMPT
+            #     )
+            #     print(f"🔧 Using HuggingFace {self.model_name} LLM")
             else:
                 # Fallback to Anthropic if Groq not available
                 try:
@@ -61,11 +87,18 @@ class AnthropicLLM:
                         system_prompt=SYSTEM_PROMPT
                     )
                     print("🔧 Using Anthropic Claude-3-Sonnet LLM (Groq fallback)")
-                except ImportError:
+                except ImportError as import_error:
                     # Final fallback to mock LLM
+                    print(f"⚠️ Anthropic import failed: {import_error}")
                     from app.core.mock_llm import MockAnthropicLLM
                     self.llm = MockAnthropicLLM(system_prompt=SYSTEM_PROMPT)
                     print("🔧 Using Mock LLM (no providers available)")
+                except Exception as anthro_error:
+                    # Fallback to mock LLM for any other error
+                    print(f"⚠️ Anthropic initialization failed: {anthro_error}")
+                    from app.core.mock_llm import MockAnthropicLLM
+                    self.llm = MockAnthropicLLM(system_prompt=SYSTEM_PROMPT)
+                    print("🔧 Using Mock LLM (Anthropic failed)")
             
             # Set as default LLM for LlamaIndex
             Settings.llm = self.llm

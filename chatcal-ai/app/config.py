@@ -14,6 +14,10 @@ class Settings(BaseSettings):
     # Groq API (primary)
     groq_api_key: str = Field(..., env="GROQ_API_KEY")
     
+    # HuggingFace API (disabled until API issues resolved)
+    # huggingface_api_token: Optional[str] = Field(None, env="HUGGINGFACE_API_TOKEN")
+    # huggingface_model_name: str = Field(default="Qwen/Qwen2.5-7B-Instruct", env="HUGGINGFACE_MODEL_NAME")
+    
     # Anthropic (optional - fallback)
     anthropic_api_key: Optional[str] = Field(None, env="ANTHROPIC_API_KEY")
     
