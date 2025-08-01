@@ -115,8 +115,10 @@ class ChatCalAgent:
     def _process_message_with_llm(self, message: str) -> str:
         """Process message using direct LLM calls with manual tool invocation."""
         try:
+            print(f"🔍 Debug - Processing message with LLM: '{message[:50]}...'")
             # Check if we need to call any tools based on the message
             tool_result = self._check_and_call_tools(message)
+            print(f"🔍 Debug - Tool result: '{tool_result[:50] if tool_result else 'None'}...')")
             
             # Create enhanced message with tool results if any
             enhanced_message = message
@@ -182,6 +184,9 @@ class ChatCalAgent:
         ]
         
         message_lower = message.lower()
+        print(f"🔍 Debug - Checking tools for message: '{message[:50]}...'")
+        print(f"🔍 Debug - User info complete: {self.has_complete_user_info()}")
+        print(f"🔍 Debug - User info: {self.user_info}")
         
         # Check availability requests
         if any(word in message_lower for word in ["available", "availability", "free", "open"]):
@@ -218,28 +223,62 @@ class ChatCalAgent:
                     return f"Could not check availability: {str(e)}"
         
         # Check for booking requests with complete info
-        if self.has_complete_user_info() and any(word in message_lower for word in ["schedule", "book", "appointment", "meeting"]):
+        booking_keywords = ["schedule", "book", "appointment", "meeting"]
+        has_booking_keyword = any(word in message_lower for word in booking_keywords)
+        print(f"🔍 Debug - Has booking keyword: {has_booking_keyword}")
+        print(f"🔍 Debug - Booking keywords found: {[word for word in booking_keywords if word in message_lower]}")
+        
+        if self.has_complete_user_info() and has_booking_keyword:
             try:
-                # Extract meeting details (basic implementation)
-                meeting_type = "consultation"  # Default
-                duration = 60  # Default
+                print(f"🔧 Processing booking request from {self.user_info['name']}: '{message}'")
                 
-                # Try to create appointment
-                create_tool = None
-                for tool in self.tools:
-                    if "create" in tool.metadata.name.lower() or "appointment" in tool.metadata.name.lower():
-                        create_tool = tool
-                        break
+                # Extract meeting details from message
+                duration = self._extract_duration(message_lower)  # Extract duration
+                meeting_type = self._extract_meeting_type(message_lower)  # Extract meeting type
                 
-                if create_tool:
-                    result = create_tool.call(
-                        title=f"Meeting with {self.user_info['name']}",
-                        attendee_email=self.user_info.get('email', ''),
-                        duration=duration
-                    )
-                    return f"Appointment creation result: {result}"
+                # Extract date and time from message
+                date_found = self._extract_date(message_lower)
+                time_found = self._extract_time(message_lower)
+                
+                print(f"📅 Extracted - Date: {date_found}, Time: {time_found}, Duration: {duration}, Type: {meeting_type}")
+                
+                # If we found both date and time, proceed with booking
+                if date_found and time_found:
+                    # Find the create appointment tool
+                    create_tool = None
+                    for tool in self.tools:
+                        if "create_appointment" == tool.metadata.name:
+                            create_tool = tool
+                            break
+                    
+                    if create_tool:
+                        # Create title based on meeting type
+                        title = f"{duration}-minute {meeting_type} with Peter Michael Gits"
+                        
+                        print(f"🔧 Calling create_appointment tool with: title='{title}', date='{date_found}', time='{time_found}', duration={duration}")
+                        
+                        # Call the tool with correct parameters
+                        result = create_tool.fn(
+                            title=title,
+                            date_string=date_found,
+                            time_string=time_found,
+                            duration_minutes=duration,
+                            description=f"Meeting with {self.user_info['name']}"
+                        )
+                        
+                        print(f"✅ Tool result: {result[:100]}...")
+                        return result
+                    else:
+                        print("❌ Could not find create_appointment tool")
+                        return "I'm having trouble accessing the calendar system right now. Please try again in a moment."
+                else:
+                    print(f"⚠️ Missing booking details - Date: {date_found}, Time: {time_found}")
+                    # If date/time not found, let the LLM handle the conversation naturally
+                    return ""
+                    
             except Exception as e:
-                return f"Could not create appointment: {str(e)}"
+                print(f"❌ Booking error: {e}")
+                return f"I encountered an issue while trying to book your appointment: {str(e)}"
         
         # First check if we're continuing a cancellation conversation
         if self.conversation_state["pending_operation"] == "cancellation" and self.conversation_state["awaiting_clarification"]:
@@ -512,6 +551,103 @@ class ChatCalAgent:
         
         return ""
     
+    def _extract_date(self, message_lower: str) -> str:
+        """Extract date from message."""
+        import re
+        
+        date_patterns = [
+            (r"tomorrow", "tomorrow"),
+            (r"today", "today"),
+            (r"monday|tuesday|wednesday|thursday|friday|saturday|sunday", None),
+            (r"next\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)", None),
+            (r"this\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)", None),
+            (r"\d{1,2}/\d{1,2}/\d{2,4}", None),
+            (r"\d{1,2}/\d{1,2}", None),
+            (r"next week", "next week"),
+            (r"this week", "this week")
+        ]
+        
+        for pattern, default_value in date_patterns:
+            match = re.search(pattern, message_lower)
+            if match:
+                return default_value or match.group()
+        
+        return None
+    
+    def _extract_time(self, message_lower: str) -> str:
+        """Extract time from message."""
+        import re
+        
+        time_patterns = [
+            r"\d{1,2}:\d{2}\s*(?:am|pm)",
+            r"\d{1,2}\s*(?:am|pm)",
+            r"\d{1,2}:\d{2}",
+            r"morning|afternoon|evening|noon"
+        ]
+        
+        for pattern in time_patterns:
+            match = re.search(pattern, message_lower)
+            if match:
+                time_str = match.group()
+                # Normalize common time formats
+                if time_str == "morning":
+                    return "9:00 AM"
+                elif time_str == "afternoon":
+                    return "2:00 PM"
+                elif time_str == "evening":
+                    return "6:00 PM"
+                elif time_str == "noon":
+                    return "12:00 PM"
+                return time_str
+        
+        return None
+    
+    def _extract_duration(self, message_lower: str) -> int:
+        """Extract duration from message in minutes."""
+        import re
+        
+        # Look for explicit duration mentions
+        duration_patterns = [
+            (r"(\d+)\s*-?\s*minute", lambda m: int(m.group(1))),
+            (r"(\d+)\s*-?\s*min", lambda m: int(m.group(1))),
+            (r"(\d+)\s*hour", lambda m: int(m.group(1)) * 60),
+            (r"(\d+)\s*hr", lambda m: int(m.group(1)) * 60),
+            (r"half\s*hour", lambda m: 30),
+            (r"(\d+)\s*and\s*a\s*half\s*hour", lambda m: int(m.group(1)) * 60 + 30)
+        ]
+        
+        for pattern, converter in duration_patterns:
+            match = re.search(pattern, message_lower)
+            if match:
+                return converter(match)
+        
+        # Default durations based on meeting type
+        if any(word in message_lower for word in ["consultation", "advisory", "meeting"]):
+            return 60
+        elif any(word in message_lower for word in ["brief", "quick", "short"]):
+            return 30
+        else:
+            return 60  # Default to 1 hour
+    
+    def _extract_meeting_type(self, message_lower: str) -> str:
+        """Extract meeting type from message."""
+        # Check for Google Meet/video keywords
+        if any(word in message_lower for word in ["google meet", "meet", "video call", "video conference", "online meeting", "virtual", "remote"]):
+            if any(word in message_lower for word in ["consultation", "advisory"]):
+                return "Google Meet Consultation"
+            else:
+                return "Google Meet Meeting"
+        
+        # Check for specific meeting types
+        if "consultation" in message_lower:
+            return "Consultation"
+        elif "advisory" in message_lower:
+            return "Advisory Session"
+        elif "project" in message_lower:
+            return "Project Meeting"
+        else:
+            return "Meeting"
+    
     def update_user_info(self, info_type: str, value: str) -> bool:
         """Update user information."""
         if info_type in self.user_info:
@@ -658,8 +794,11 @@ class ChatCalAgent:
             if not self.conversation_started:
                 self.start_conversation()
             
+            print(f"🔍 Debug - About to call _process_message_with_llm")
             # Regular chat interaction using direct LLM
-            return self._process_message_with_llm(message)
+            result = self._process_message_with_llm(message)
+            print(f"🔍 Debug - Result from _process_message_with_llm: '{result[:100] if result else 'None'}...'")
+            return result
             
         except Exception as e:
             print(f"⚠️ Agent error: {e}")
