@@ -278,11 +278,72 @@ class ChatCalAgent:
                 except Exception as e:
                     return f"Could not check availability: {str(e)}"
         
-        # Check for booking requests with complete info
+        # Check for booking requests
         booking_keywords = ["schedule", "book", "appointment", "meeting", "meet", "googlemeet", "zoom", "call"]
         has_booking_keyword = any(word in message_lower for word in booking_keywords)
         
+        # If user is trying to book, check what info we need
+        if has_booking_keyword:
+            date_found = self._extract_date(message_lower)
+            time_found = self._extract_time(message_lower)
+            has_duration = self._has_explicit_duration(message_lower)
+            
+            # For availability check, we need date + time + duration
+            missing_for_availability = []
+            if not date_found:
+                missing_for_availability.append("date")
+            if not time_found:
+                missing_for_availability.append("time")
+            if not has_duration:
+                missing_for_availability.append("duration")
+            
+            # If we're missing info needed for availability check, ask for it
+            if missing_for_availability:
+                if len(missing_for_availability) == 1:
+                    if "duration" in missing_for_availability:
+                        return "How long would you like the meeting to be? (30 minutes, 1 hour, 90 minutes, etc.)"
+                    elif "time" in missing_for_availability:
+                        return "What time would you prefer?"
+                    elif "date" in missing_for_availability:
+                        return "What date works for you?"
+                else:
+                    # Ask for multiple missing items
+                    missing_items = []
+                    if "date" in missing_for_availability:
+                        missing_items.append("date")
+                    if "time" in missing_for_availability:
+                        missing_items.append("time")
+                    if "duration" in missing_for_availability:
+                        missing_items.append("how long")
+                    
+                    if len(missing_items) == 2:
+                        return f"What {missing_items[0]} and {missing_items[1]}?"
+                    else:
+                        return f"What {', '.join(missing_items[:-1])}, and {missing_items[-1]}?"
+        
         if self.has_complete_user_info() and has_booking_keyword:
+            # Re-extract meeting details to ensure we have everything
+            date_found = self._extract_date(message_lower)
+            time_found = self._extract_time(message_lower)
+            has_duration = self._has_explicit_duration(message_lower)
+            
+            # STRICT CHECK: Make sure we have ALL required info for booking
+            missing_items = []
+            if not date_found:
+                missing_items.append("date")
+            if not time_found:
+                missing_items.append("time")
+            if not has_duration:
+                missing_items.append("duration")
+            
+            if missing_items:
+                # Return to the missing information collection logic
+                if "duration" in missing_items:
+                    return "How long would you like the meeting to be? (30 minutes, 1 hour, 90 minutes, etc.)"
+                else:
+                    missing_str = ", ".join(missing_items[:-1]) + (" and " + missing_items[-1] if len(missing_items) > 1 else missing_items[0])
+                    return f"I still need the {missing_str} to proceed with booking."
+            
             try:
                 print(f"🔧 Processing booking request from {self.user_info['name']}: '{message}'")
                 
@@ -290,20 +351,13 @@ class ChatCalAgent:
                 duration = self._extract_duration(message_lower)  # Extract duration
                 meeting_type = self._extract_meeting_type(message_lower)  # Extract meeting type
                 
-                # Extract date and time from message
-                date_found = self._extract_date(message_lower)
-                time_found = self._extract_time(message_lower)
-                
                 # Special case: if user says "now" but no date, default to "today"
                 if "now" in message_lower and not date_found and time_found:
                     date_found = "today"
                     print(f"🔍 DEBUG: 'now' detected without date, defaulting to 'today'")
                     print(f"🔍 DEBUG: After 'now' fix - date_found='{repr(date_found)}', time_found='{repr(time_found)}'")
                 
-                print(f"🔍 DEBUG: Raw extractions - Date: '{date_found}', Time: '{time_found}'")
                 print(f"📅 Extracted - Date: {date_found}, Time: {time_found}, Duration: {duration}, Type: {meeting_type}")
-                print(f"🔍 DEBUG: Raw values - date_found='{repr(date_found)}', time_found='{repr(time_found)}'")
-                print(f"🔍 DEBUG: Boolean values - date_found: {bool(date_found)}, time_found: {bool(time_found)}")
                 
                 # If we found both date and time, validate it's not in the past
                 print(f"🔍 DEBUG: Checking booking condition - date_found: {bool(date_found)}, time_found: {bool(time_found)}")
@@ -331,13 +385,16 @@ class ChatCalAgent:
                         print(f"🔧 Calling create_appointment tool with: title='{title}', date='{date_found}', time='{time_found}', duration={duration}")
                         
                         try:
-                            # Call the tool with correct parameters
+                            # Call the tool with correct parameters including user info
                             result = create_tool.fn(
                                 title=title,
                                 date_string=date_found,
                                 time_string=time_found,
                                 duration_minutes=duration,
-                                description=f"Meeting with {self.user_info['name']}"
+                                description=f"Meeting with {self.user_info['name']}",
+                                user_name=self.user_info.get('name'),
+                                user_email=self.user_info.get('email'),
+                                user_phone=self.user_info.get('phone')
                             )
                             print(f"🔍 DEBUG: Tool call completed successfully")
                         except Exception as tool_error:
@@ -872,10 +929,23 @@ class ChatCalAgent:
         else:
             return 60  # Default to 1 hour
     
+    def _has_explicit_duration(self, message_lower: str) -> bool:
+        """Check if message explicitly mentions specific duration."""
+        # Check for specific duration patterns
+        duration_patterns = [
+            r'\d+\s*(minutes?|mins?|hours?|hrs?)',  # "30 minutes", "1 hour"
+            r'(half|thirty)\s*minutes?',  # "half hour", "thirty minutes"
+            r'(one|two|three)\s*hours?',  # "one hour", "two hours"
+            r'(quick|short|brief)\s*(call|meeting|chat)',  # "quick call" (implies short)
+        ]
+        
+        import re
+        return any(re.search(pattern, message_lower) for pattern in duration_patterns)
+    
     def _extract_meeting_type(self, message_lower: str) -> str:
         """Extract meeting type from message."""
         # Check for Google Meet/video keywords
-        if any(word in message_lower for word in ["google meet", "meet", "video call", "video conference", "online meeting", "virtual", "remote"]):
+        if any(word in message_lower for word in ["google meet", "meet", "video call", "video conference", "web conference", "online meeting", "virtual", "remote"]):
             if any(word in message_lower for word in ["consultation", "advisory"]):
                 return "Google Meet Consultation"
             else:
