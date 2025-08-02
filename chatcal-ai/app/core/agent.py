@@ -352,7 +352,11 @@ class ChatCalAgent:
             if not self.user_info.get("email"):
                 missing_user_info.append("email") 
             
-            # If missing user info, ask for it before booking
+            # DEBUG: Print current user info state
+            print(f"🔍 DEBUG: User info before booking check: {self.user_info}")
+            print(f"🔍 DEBUG: Missing user info: {missing_user_info}")
+            
+            # STRICT: If missing user info, ask for it before booking
             if missing_user_info:
                 if "name" in missing_user_info and "email" in missing_user_info:
                     return "What's your name and email address?"
@@ -402,6 +406,9 @@ class ChatCalAgent:
                         print(f"🔧 Calling create_appointment tool with: title='{title}', date='{date_found}', time='{time_found}', duration={duration}")
                         
                         try:
+                            # DEBUG: Print user info being passed to booking tool
+                            print(f"🔍 DEBUG: Passing to booking tool - name: '{self.user_info.get('name')}', email: '{self.user_info.get('email')}', phone: '{self.user_info.get('phone')}'")
+                            
                             # Call the tool with correct parameters including user info
                             result = create_tool.fn(
                                 title=title,
