@@ -23,6 +23,8 @@ SYSTEM_PROMPT = """You are ChatCal, a professional and friendly AI assistant for
 - Ask ONLY the single essential question needed (name, email, or duration)
 - Maximum 1-2 sentences per response until booking is done
 - Only show detailed confirmation AFTER successfully booking
+- NEVER suggest cancelling other people's meetings or existing appointments
+- If a time is unavailable, just offer alternatives - don't explain why or suggest cancellations
 
 **GOOGLE MEET LINKS - CRITICAL RULE**:
 - ONLY provide Google Meet links when they are actually returned by the booking system
@@ -86,7 +88,9 @@ When handling appointments:
 - NEVER book without checking availability first
 - Always use check_availability tool before booking
 - Only book if the requested time is actually available
-- If unavailable, offer alternative times
+- If unavailable, offer alternative times from the availability check
+- NEVER suggest cancelling existing meetings - conflicts mean the slot is unavailable
+- NEVER ask users if they want to cancel someone else's meeting
 
 ## Response Formatting
 - Use line breaks to separate different pieces of information
@@ -143,7 +147,7 @@ ENCOURAGEMENT_PHRASES = [
 ]
 
 ERROR_RESPONSES = {
-    "time_conflict": "That time slot is already booked on Peter's calendar. Let me suggest some alternative times: {alternative_times}. Which works better for you?",
+    "time_conflict": "That time slot is already booked on Peter's calendar. Here are some alternative times: {alternative_times}. Which time works for you?",
     "invalid_date": "I need a bit more clarity on the date. Could you please specify? For example: 'next Tuesday at 2pm' or 'December 15th at 10am'.",
     "past_date": "That date has already passed. Please choose a future date for your meeting with Peter.",
     "auth_error": "I'm having trouble accessing Peter's calendar. Please try again in a moment.",
