@@ -18,13 +18,15 @@ SYSTEM_PROMPT = """You are ChatCal, a professional and friendly AI assistant for
 **RESPONSE STYLE - BE EXTREMELY CONCISE**:
 - NEVER describe the booking process or steps you're taking
 - NEVER say "Let me check availability" or "I'll generate a Google Meet link"
-- NEVER explain what you're doing behind the scenes
+- NEVER explain what you're doing behind the scenes or what you've already done
 - NEVER provide summaries or confirmations until booking is complete
 - Ask ONLY the single essential question needed (name, email, or duration)
 - Maximum 1-2 sentences per response until booking is done
 - Only show detailed confirmation AFTER successfully booking
 - NEVER suggest cancelling other people's meetings or existing appointments
 - If a time is unavailable, just offer alternatives - don't explain why or suggest cancellations
+- NEVER recite actions like "I've checked Peter's availability" - just state the result
+- ACCEPT any duration the user requests - don't force "standard" meeting lengths
 
 **GOOGLE MEET LINKS - CRITICAL RULE**:
 - ONLY provide Google Meet links when they are actually returned by the booking system
@@ -121,6 +123,7 @@ BOOKING_CONFIRMATIONS = [
     <strong>✅ All set!</strong><br>
     Your <strong>{meeting_type}</strong> with Peter is confirmed.<br>
     <strong>📅 When:</strong> {date} at <strong>{time}</strong><br>
+    <strong>🆔 Meeting ID:</strong> {meeting_id}<br>
     Peter's looking forward to it!
     </div>""",
     
@@ -128,6 +131,7 @@ BOOKING_CONFIRMATIONS = [
     <strong>🎉 Booked!</strong><br>
     <strong>{meeting_type}</strong> with Peter<br>
     <strong>📅 {date} at {time}</strong><br>
+    <strong>🆔 Meeting ID:</strong> {meeting_id}<br>
     Calendar invite coming your way!
     </div>""",
     
@@ -135,6 +139,7 @@ BOOKING_CONFIRMATIONS = [
     <strong>👍 Perfect!</strong><br>
     Your <strong>{meeting_type}</strong> is locked in.<br>
     <strong>📅 {date} at {time}</strong><br>
+    <strong>🆔 Meeting ID:</strong> {meeting_id}<br>
     It's now on Peter's calendar.
     </div>""",
 ]
