@@ -282,23 +282,8 @@ class ChatCalAgent:
         booking_keywords = ["schedule", "book", "appointment", "meeting", "meet", "googlemeet", "zoom", "call"]
         has_booking_keyword = any(word in message_lower for word in booking_keywords)
         
-        # If user is trying to book, FIRST ensure we have user info
+        # If user is trying to book, check what info we need for AVAILABILITY first
         if has_booking_keyword:
-            # Check if we have minimum user info for booking
-            missing_user_info = []
-            if not self.user_info.get("name"):
-                missing_user_info.append("name")
-            if not self.user_info.get("email"):
-                missing_user_info.append("email") 
-            
-            # If missing user info, ask for it first before checking meeting details
-            if missing_user_info:
-                if "name" in missing_user_info and "email" in missing_user_info:
-                    return "What's your name and email address?"
-                elif "name" in missing_user_info:
-                    return "What's your first name?"
-                elif "email" in missing_user_info:
-                    return "What's your email address?"
             date_found = self._extract_date(message_lower)
             time_found = self._extract_time(message_lower)
             has_duration = self._has_explicit_duration(message_lower)
@@ -336,7 +321,8 @@ class ChatCalAgent:
                     else:
                         return f"What {', '.join(missing_items[:-1])}, and {missing_items[-1]}?"
         
-        if self.has_complete_user_info() and has_booking_keyword:
+        # Only proceed with booking if we have date + time + duration
+        if has_booking_keyword:
             # Re-extract meeting details to ensure we have everything
             date_found = self._extract_date(message_lower)
             time_found = self._extract_time(message_lower)
@@ -358,6 +344,22 @@ class ChatCalAgent:
                 else:
                     missing_str = ", ".join(missing_items[:-1]) + (" and " + missing_items[-1] if len(missing_items) > 1 else missing_items[0])
                     return f"I still need the {missing_str} to proceed with booking."
+            
+            # NOW check for user info (only after we have meeting details)
+            missing_user_info = []
+            if not self.user_info.get("name"):
+                missing_user_info.append("name")
+            if not self.user_info.get("email"):
+                missing_user_info.append("email") 
+            
+            # If missing user info, ask for it before booking
+            if missing_user_info:
+                if "name" in missing_user_info and "email" in missing_user_info:
+                    return "What's your name and email address?"
+                elif "name" in missing_user_info:
+                    return "What's your first name?"
+                elif "email" in missing_user_info:
+                    return "What's your email address?"
             
             try:
                 print(f"🔧 Processing booking request from {self.user_info['name']}: '{message}'")
