@@ -382,7 +382,12 @@ async def chat_widget(request: Request):
                 if (isUser) {{
                     messageContent.textContent = content;
                 }} else {{
-                    messageContent.innerHTML = content;
+                    // Check if content contains HTML tags and render accordingly
+                    if (content && typeof content === 'string' && (content.includes('<') || content.includes('&'))) {{
+                        messageContent.innerHTML = content;
+                    }} else {{
+                        messageContent.textContent = content || 'Empty response';
+                    }}
                 }}
                 
                 messageDiv.appendChild(avatar);
@@ -961,7 +966,12 @@ async def chat_widget_original(request: Request):
                 if (isUser) {{
                     messageContent.textContent = content;
                 }} else {{
-                    messageContent.innerHTML = content;
+                    // Check if content contains HTML tags and render accordingly
+                    if (content && typeof content === 'string' && (content.includes('<') || content.includes('&'))) {{
+                        messageContent.innerHTML = content;
+                    }} else {{
+                        messageContent.textContent = content || 'Empty response';
+                    }}
                 }}
                 
                 messageDiv.appendChild(avatar);
