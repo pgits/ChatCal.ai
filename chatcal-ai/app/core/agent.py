@@ -282,8 +282,23 @@ class ChatCalAgent:
         booking_keywords = ["schedule", "book", "appointment", "meeting", "meet", "googlemeet", "zoom", "call"]
         has_booking_keyword = any(word in message_lower for word in booking_keywords)
         
-        # If user is trying to book, check what info we need
+        # If user is trying to book, FIRST ensure we have user info
         if has_booking_keyword:
+            # Check if we have minimum user info for booking
+            missing_user_info = []
+            if not self.user_info.get("name"):
+                missing_user_info.append("name")
+            if not self.user_info.get("email"):
+                missing_user_info.append("email") 
+            
+            # If missing user info, ask for it first before checking meeting details
+            if missing_user_info:
+                if "name" in missing_user_info and "email" in missing_user_info:
+                    return "What's your name and email address?"
+                elif "name" in missing_user_info:
+                    return "What's your first name?"
+                elif "email" in missing_user_info:
+                    return "What's your email address?"
             date_found = self._extract_date(message_lower)
             time_found = self._extract_time(message_lower)
             has_duration = self._has_explicit_duration(message_lower)
@@ -973,10 +988,15 @@ class ChatCalAgent:
         return self.user_info.copy()
     
     def has_complete_user_info(self) -> bool:
-        """Check if minimum required user information is collected (name + at least one contact)."""
+        """Check if minimum required user information is collected (name + email)."""
         has_name = bool(self.user_info.get("name"))
-        has_contact = bool(self.user_info.get("email") or self.user_info.get("phone"))
-        return has_name and has_contact
+        has_email = bool(self.user_info.get("email"))
+        
+        # DEBUG: Print current user info
+        print(f"🔍 DEBUG user_info check - name: '{self.user_info.get('name')}', email: '{self.user_info.get('email')}'")
+        
+        # Require BOTH name and email for booking
+        return has_name and has_email
     
     def has_ideal_user_info(self) -> bool:
         """Check if all preferred user information is collected (name + both contacts)."""
