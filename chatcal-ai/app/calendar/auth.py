@@ -34,6 +34,7 @@ class CalendarAuth:
             self.redirect_uri = "http://localhost:8000/auth/callback"
         self.credentials_path = settings.google_credentials_path
         self._service = None
+        self._cached_credentials = None  # For Cloud Run memory-based credential storage
     
     def create_auth_flow(self, state: Optional[str] = None) -> Flow:
         """Create OAuth2 flow for authentication."""
@@ -81,6 +82,15 @@ class CalendarAuth:
     
     def save_credentials(self, credentials: Credentials):
         """Save credentials to file for future use."""
+        # For Cloud Run production, store in memory/session only since file system is ephemeral
+        if os.getenv('ENVIRONMENT') == 'production':
+            # Store credentials in class instance for session persistence
+            # Note: This will only persist for the current container instance
+            self._cached_credentials = credentials
+            print("📝 Credentials cached in memory for Cloud Run session")
+            return
+            
+        # For local development, save to file
         os.makedirs(os.path.dirname(self.credentials_path), exist_ok=True)
         
         creds_data = {
@@ -98,6 +108,20 @@ class CalendarAuth:
     
     def load_credentials(self) -> Optional[Credentials]:
         """Load saved credentials from file."""
+        # For Cloud Run production, try to load from memory cache first
+        if os.getenv('ENVIRONMENT') == 'production':
+            if hasattr(self, '_cached_credentials') and self._cached_credentials:
+                credentials = self._cached_credentials
+                # Refresh if expired
+                if credentials.expired and credentials.refresh_token:
+                    credentials.refresh(Request())
+                    self._cached_credentials = credentials
+                    print("🔄 Refreshed cached credentials")
+                return credentials
+            print("⚠️ No cached credentials found in Cloud Run session")
+            return None
+        
+        # For local development, load from file
         if not os.path.exists(self.credentials_path):
             return None
         
