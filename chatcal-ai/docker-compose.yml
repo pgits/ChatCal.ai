@@ -9,6 +9,7 @@ services:
     environment:
       - APP_ENV=production
       - REDIS_URL=redis://redis:6379/0
+      - OAUTHLIB_INSECURE_TRANSPORT=1
     env_file:
       - .env
     depends_on:

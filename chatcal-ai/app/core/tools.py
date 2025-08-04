@@ -136,7 +136,19 @@ class CalendarTools:
             conflicts = self.calendar_service.check_conflicts(start_time, end_time)
             if conflicts:
                 conflict_summaries = [event.get('summary', 'Untitled') for event in conflicts]
-                return f"Oops! You already have {', '.join(conflict_summaries)} scheduled at that time. How about we find a different slot?"
+                
+                # Get alternative times for the same day with the same duration
+                alternatives = self.calendar_service.get_availability(
+                    date=start_time,
+                    duration_minutes=duration_minutes
+                )
+                
+                if alternatives:
+                    # Format alternatives properly
+                    alternative_times = self.formatter.format_availability_list(alternatives)
+                    return f"Oops! You already have {', '.join(conflict_summaries)} scheduled at that time. Here are available {self.formatter.format_duration(duration_minutes)} slots for the same day: {alternative_times}. Which time works better for you?"
+                else:
+                    return f"Oops! You already have {', '.join(conflict_summaries)} scheduled at that time. Unfortunately, there are no other {self.formatter.format_duration(duration_minutes)} slots available that day. Would you like to try a different day?"
             
             # Create the event
             event = self.calendar_service.create_event(
@@ -222,7 +234,8 @@ class CalendarTools:
                 meeting_type=title,
                 attendee=user_name or "your meeting",
                 date=formatted_time.split(" at ")[0],
-                time=formatted_time.split(" at ")[1]
+                time=formatted_time.split(" at ")[1],
+                meeting_id=custom_meeting_id
             )
             
             # Add email status to confirmation
@@ -266,18 +279,12 @@ class CalendarTools:
             
             # Format email status with better HTML
             email_html = ""
-            if user_email and email_sent_to_user and email_sent_to_peter:
-                email_html = '<div style="color: #4caf50; margin: 8px 0;"><strong>📧 Invites sent to both you and Peter!</strong></div>'
-            elif user_email and email_sent_to_user and not email_sent_to_peter:
-                email_html = '<div style="color: #ff9800; margin: 8px 0;"><strong>📧 Your invite sent.</strong> Issue with Peter\'s email.</div>'
-            elif user_email and not email_sent_to_user and email_sent_to_peter:
-                email_html = '<div style="color: #ff9800; margin: 8px 0;"><strong>📧 Peter\'s invite sent.</strong> Issue with your email.</div>'
-            elif user_email and not email_sent_to_user and not email_sent_to_peter:
-                email_html = '<div style="color: #f44336; margin: 8px 0;"><strong>📧 Email issues</strong> but meeting is confirmed!</div>'
-            elif not user_email and email_sent_to_peter:
-                email_html = '<div style="color: #2196f3; margin: 8px 0;"><strong>📧 Peter notified!</strong> Want a calendar invite? Just share your email.</div>'
-            elif not user_email and not email_sent_to_peter:
+            if user_email and email_sent_to_user:
+                email_html = '<div style="color: #4caf50; margin: 8px 0;"><strong>📧 Calendar invitation sent!</strong></div>'
+            elif user_email and not email_sent_to_user:
                 email_html = '<div style="color: #ff9800; margin: 8px 0;"><strong>📧 Email issue</strong> but meeting is confirmed!</div>'
+            elif not user_email:
+                email_html = '<div style="color: #2196f3; margin: 8px 0;"><strong>📧 Want a calendar invite?</strong> Just share your email.</div>'
             
             # Format Google Meet info
             meet_html = ""

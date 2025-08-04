@@ -1,6 +1,6 @@
 """Main FastAPI application for ChatCal.ai."""
 
-from fastapi import FastAPI, HTTPException, Depends, Request, status
+from fastapi import FastAPI, HTTPException, Depends, Request, status, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -19,6 +19,7 @@ from app.api.models import (
 )
 from app.api.chat_widget import router as chat_widget_router
 from app.api.simple_chat import router as simple_chat_router
+# from app.api.audio_websocket import audio_websocket_endpoint  # Temporarily disabled due to import issues
 from app.core.session import session_manager
 from app.calendar.auth import CalendarAuth
 from app.core.exceptions import (
@@ -58,9 +59,18 @@ else:
 # Calendar auth instance
 calendar_auth = CalendarAuth()
 
+# Mount static files
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
 # Include routers
 app.include_router(chat_widget_router)
 app.include_router(simple_chat_router)
+
+# Add audio WebSocket endpoint
+# @app.websocket("/ws/audio/{session_id}")
+# async def websocket_audio_endpoint(websocket: WebSocket, session_id: str):
+#     """WebSocket endpoint for audio chat functionality."""
+#     await audio_websocket_endpoint(websocket, session_id)
 
 
 # Global exception handlers
@@ -179,8 +189,11 @@ async def health_check():
     
     # Check Redis connection
     try:
-        session_manager.redis_client.ping()
-        services["database"] = "healthy"
+        if session_manager.use_redis:
+            session_manager.redis_client.ping()
+            services["database"] = "healthy (Redis)"
+        else:
+            services["database"] = "healthy (in-memory)"
     except Exception as e:
         logger.error(f"Redis health check failed: {e}")
         services["database"] = "unhealthy"
@@ -300,10 +313,16 @@ async def chat(request: ChatRequest):
         if not request.session_id:
             request.session_id = session_manager.create_session()
         
-        # Get or create conversation
+        # Get or create conversation - but first ensure session exists
+        session_data = session_manager.get_session(request.session_id)
+        if not session_data:
+            # Session doesn't exist, create it
+            print(f"⚠️ Session {request.session_id} not found, creating new one")
+            request.session_id = session_manager.create_session()
+        
         conversation = session_manager.get_or_create_conversation(request.session_id)
         if not conversation:
-            raise HTTPException(status_code=404, detail="Session not found")
+            raise HTTPException(status_code=404, detail="Failed to create conversation")
         
         # Get response from agent
         response = conversation.get_response(request.message)
@@ -319,7 +338,11 @@ async def chat(request: ChatRequest):
         )
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Chat error: {str(e)}")
+        import traceback
+        error_traceback = traceback.format_exc()
+        print(f"❌ CHAT ERROR: {type(e).__name__}: {str(e)}")
+        print(f"❌ TRACEBACK: {error_traceback}")
+        raise HTTPException(status_code=500, detail=f"Chat error: {type(e).__name__}: {str(e) or 'Unknown error'} | {error_traceback[:200]}")
 
 
 @app.post("/chat/stream")
@@ -461,9 +484,12 @@ async def general_exception_handler(request: Request, exc: Exception):
 
 if __name__ == "__main__":
     import uvicorn
+    import os
+    # Use PORT environment variable for Cloud Run, fallback to settings
+    port = int(os.getenv('PORT', settings.app_port))
     uvicorn.run(
         "app.api.main:app",
         host=settings.app_host,
-        port=settings.app_port,
+        port=port,
         reload=True if settings.app_env == "development" else False
     )

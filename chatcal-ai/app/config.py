@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     app_name: str = Field(default="ChatCal.ai", env="APP_NAME")
     app_env: str = Field(default="development", env="APP_ENV")
     app_host: str = Field(default="0.0.0.0", env="APP_HOST")
-    app_port: int = Field(default=8000, env="APP_PORT")
+    app_port: int = Field(default=8080, env="PORT,APP_PORT")
     
     # Groq API (primary)
     groq_api_key: str = Field(..., env="GROQ_API_KEY")

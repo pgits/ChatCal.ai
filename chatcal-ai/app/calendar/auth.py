@@ -11,6 +11,9 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from app.config import settings
 
+# Allow HTTP for local development (OAuth2 normally requires HTTPS)
+os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
+
 
 class CalendarAuth:
     """Handles Google Calendar OAuth2 authentication."""

@@ -390,7 +390,39 @@ class ChatCalAgent:
                     elif past_result == "past_but_acceptable":
                         print(f"🔍 DEBUG: Allowing booking within 15-minute grace period")
                         # Continue with booking - it's within the grace period
-                    print(f"🔍 DEBUG: Proceeding with booking - date: {date_found}, time: {time_found}")
+                    print(f"🔍 DEBUG: Proceeding with availability check - date: {date_found}, time: {time_found}")
+                    
+                    # FIRST: Check availability before attempting to book
+                    availability_tool = None
+                    for tool in self.tools:
+                        if "check_availability" in tool.metadata.name:
+                            availability_tool = tool
+                            break
+                    
+                    if availability_tool:
+                        print(f"🔍 DEBUG: Checking availability first...")
+                        try:
+                            availability_result = availability_tool.fn(
+                                date_string=date_found,
+                                duration_minutes=duration
+                            )
+                            print(f"✅ Availability check result: {availability_result[:200]}...")
+                            
+                            # If availability result contains conflict indicators, return it
+                            conflict_indicators = [
+                                "Oops!", "already have", "conflict", "scheduled at that time",
+                                "alternative times", "different slot", "available", "slots"
+                            ]
+                            
+                            if any(indicator in availability_result for indicator in conflict_indicators):
+                                print(f"⚠️ Conflict detected or alternatives provided - returning availability result")
+                                return availability_result
+                                
+                        except Exception as e:
+                            print(f"❌ Availability check failed: {e}")
+                            # Continue with booking attempt if availability check fails
+                    
+                    print(f"🔍 DEBUG: Availability check passed, proceeding with booking - date: {date_found}, time: {time_found}")
                     # Find the create appointment tool
                     create_tool = None
                     for tool in self.tools:
@@ -403,22 +435,25 @@ class ChatCalAgent:
                         # Create title based on meeting type
                         title = f"{duration}-minute {meeting_type} with Peter Michael Gits"
                         
-                        print(f"🔧 Calling create_appointment tool with: title='{title}', date='{date_found}', time='{time_found}', duration={duration}")
+                        # Check if user requested Google Meet
+                        create_meet = any(keyword in message_lower for keyword in [
+                            'google meet', 'meet', 'video call', 'video conference', 
+                            'online meeting', 'virtual meeting', 'conference call', 'online', 'remote'
+                        ])
+                        
+                        print(f"🔧 Calling create_appointment tool with: title='{title}', date='{date_found}', time='{time_found}', duration={duration}, create_meet={create_meet}")
                         
                         try:
                             # DEBUG: Print user info being passed to booking tool
                             print(f"🔍 DEBUG: Passing to booking tool - name: '{self.user_info.get('name')}', email: '{self.user_info.get('email')}', phone: '{self.user_info.get('phone')}'")
                             
-                            # Call the tool with correct parameters including user info
+                            # Call the tool with correct parameters (create_appointment_with_user_info signature)
                             result = create_tool.fn(
                                 title=title,
                                 date_string=date_found,
                                 time_string=time_found,
                                 duration_minutes=duration,
-                                description=f"Meeting with {self.user_info['name']}",
-                                user_name=self.user_info.get('name'),
-                                user_email=self.user_info.get('email'),
-                                user_phone=self.user_info.get('phone')
+                                description=f"Meeting with {self.user_info['name']}"
                             )
                             print(f"🔍 DEBUG: Tool call completed successfully")
                         except Exception as tool_error:
@@ -957,9 +992,9 @@ class ChatCalAgent:
         """Check if message explicitly mentions specific duration."""
         # Check for specific duration patterns
         duration_patterns = [
-            r'\d+\s*(minutes?|mins?|hours?|hrs?)',  # "30 minutes", "1 hour"
-            r'(half|thirty)\s*minutes?',  # "half hour", "thirty minutes"
-            r'(one|two|three)\s*hours?',  # "one hour", "two hours"
+            r'\d+\s*-?\s*(minutes?|mins?|hours?|hrs?)',  # "30 minutes", "15-minute", "1 hour"
+            r'(half|thirty)\s*-?\s*minutes?',  # "half hour", "thirty minutes", "thirty-minute"
+            r'(one|two|three)\s*-?\s*hours?',  # "one hour", "two hours", "one-hour"
             r'(quick|short|brief)\s*(call|meeting|chat)',  # "quick call" (implies short)
         ]
         
