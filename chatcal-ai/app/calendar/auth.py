@@ -24,7 +24,21 @@ class CalendarAuth:
         'https://www.googleapis.com/auth/calendar.events'
     ]
     
+    # Singleton pattern for shared credential storage
+    _instance = None
+    _initialized = False
+    
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(CalendarAuth, cls).__new__(cls)
+        return cls._instance
+    
     def __init__(self):
+        # Only initialize once (singleton pattern)
+        if CalendarAuth._initialized:
+            return
+        CalendarAuth._initialized = True
+        
         self.client_id = settings.google_client_id
         self.client_secret = settings.google_client_secret
         # Use Cloud Run URL for production, localhost for development
