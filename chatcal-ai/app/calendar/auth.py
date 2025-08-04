@@ -6,6 +6,7 @@ from typing import Optional, Dict
 from datetime import datetime, timedelta
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
+from google.oauth2.service_account import Credentials as ServiceAccountCredentials
 from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
@@ -165,7 +166,8 @@ class CalendarAuth:
     def get_calendar_service(self, credentials: Optional[Credentials] = None):
         """Get authenticated Google Calendar service."""
         if not credentials:
-            credentials = self.load_credentials()
+            # Try service account first (production), then OAuth (development)
+            credentials = self._get_service_account_credentials() or self.load_credentials()
             
         if not credentials:
             raise ValueError("No valid credentials available. Please authenticate first.")
@@ -174,6 +176,42 @@ class CalendarAuth:
             self._service = build('calendar', 'v3', credentials=credentials)
         
         return self._service
+    
+    def _get_service_account_credentials(self) -> Optional[ServiceAccountCredentials]:
+        """Get service account credentials from Google Secret Manager or environment."""
+        try:
+            # For production (Cloud Run), get from Secret Manager
+            if os.getenv('ENVIRONMENT') == 'production':
+                from google.cloud import secretmanager
+                
+                client = secretmanager.SecretManagerServiceClient()
+                project_id = "chatcal-ai-prod-monroe919"
+                secret_name = f"projects/{project_id}/secrets/service-account-key/versions/latest"
+                
+                response = client.access_secret_version(request={"name": secret_name})
+                secret_data = response.payload.data.decode("UTF-8")
+                service_account_info = json.loads(secret_data)
+                
+                credentials = ServiceAccountCredentials.from_service_account_info(
+                    service_account_info,
+                    scopes=self.SCOPES
+                )
+                print("🔧 Using service account credentials from Secret Manager")
+                return credentials
+                
+            # For local development, try environment variable
+            elif os.getenv('GOOGLE_APPLICATION_CREDENTIALS'):
+                credentials = ServiceAccountCredentials.from_service_account_file(
+                    os.getenv('GOOGLE_APPLICATION_CREDENTIALS'),
+                    scopes=self.SCOPES
+                )
+                print("🔧 Using service account credentials from file")
+                return credentials
+                
+        except Exception as e:
+            print(f"⚠️ Service account authentication failed: {e}")
+            
+        return None
     
     def revoke_credentials(self):
         """Revoke stored credentials."""
@@ -193,7 +231,13 @@ class CalendarAuth:
     def is_authenticated(self) -> bool:
         """Check if valid credentials exist."""
         try:
-            credentials = self.load_credentials()
-            return credentials is not None and credentials.valid
+            # Check service account credentials first
+            service_credentials = self._get_service_account_credentials()
+            if service_credentials:
+                return True
+                
+            # Fallback to OAuth credentials
+            oauth_credentials = self.load_credentials()
+            return oauth_credentials is not None and oauth_credentials.valid
         except:
             return False
