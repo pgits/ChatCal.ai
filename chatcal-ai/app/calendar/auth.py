@@ -29,7 +29,7 @@ class CalendarAuth:
         self.client_secret = settings.google_client_secret
         # Use Cloud Run URL for production, localhost for development
         if os.getenv('ENVIRONMENT') == 'production':
-            self.redirect_uri = "https://chatcal-ai-imoco2uwrq-ue.a.run.app/auth/callback"
+            self.redirect_uri = "https://chatcal-ai-432729289953.us-east1.run.app/auth/callback"
         else:
             self.redirect_uri = "http://localhost:8000/auth/callback"
         self.credentials_path = settings.google_credentials_path
