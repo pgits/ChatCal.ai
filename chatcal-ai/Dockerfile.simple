@@ -1,0 +1,3 @@
+FROM gcr.io/chatcal-ai-prod-monroe919/chatcal-ai:latest
+EXPOSE 8080
+CMD ["python", "-m", "app.api.main"]

@@ -1,0 +1,331 @@
+/**
+ * Audio recording functionality adapted from Unmute patterns
+ * Handles browser audio capture, WebSocket communication, and audio playback
+ */
+
+class AudioRecorder {
+    constructor(options = {}) {
+        this.sessionId = options.sessionId;
+        this.websocketUrl = options.websocketUrl || `ws://localhost:8000/ws/audio/${this.sessionId}`;
+        this.sampleRate = options.sampleRate || 16000;
+        this.channels = options.channels || 1;
+        
+        // Audio recording state
+        this.isRecording = false;
+        this.isConnected = false;
+        this.mediaRecorder = null;
+        this.audioStream = null;
+        this.websocket = null;
+        
+        // Audio playback
+        this.audioContext = null;
+        this.audioQueue = [];
+        this.isPlaying = false;
+        
+        // Event callbacks
+        this.onTranscription = options.onTranscription || (() => {});
+        this.onSpeechStart = options.onSpeechStart || (() => {});
+        this.onSpeechEnd = options.onSpeechEnd || (() => {});
+        this.onError = options.onError || console.error;
+        this.onStatusChange = options.onStatusChange || (() => {});
+        
+        this.sequenceNumber = 0;
+    }
+    
+    async initialize() {
+        try {
+            // Initialize audio context
+            this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            
+            // Request microphone permission
+            this.audioStream = await navigator.mediaDevices.getUserMedia({
+                audio: {
+                    sampleRate: this.sampleRate,
+                    channelCount: this.channels,
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true
+                }
+            });
+            
+            console.log('Audio initialized successfully');
+            return true;
+        } catch (error) {
+            console.error('Failed to initialize audio:', error);
+            this.onError('Microphone access denied. Please allow microphone access to use voice features.');
+            return false;
+        }
+    }
+    
+    async connect() {
+        if (this.isConnected) {
+            return;
+        }
+        
+        try {
+            this.websocket = new WebSocket(this.websocketUrl);
+            
+            this.websocket.onopen = () => {
+                console.log('Audio WebSocket connected');
+                this.isConnected = true;
+                this.onStatusChange('connected');
+            };
+            
+            this.websocket.onmessage = (event) => {
+                this.handleWebSocketMessage(JSON.parse(event.data));
+            };
+            
+            this.websocket.onclose = () => {
+                console.log('Audio WebSocket disconnected');
+                this.isConnected = false;
+                this.onStatusChange('disconnected');
+            };
+            
+            this.websocket.onerror = (error) => {
+                console.error('WebSocket error:', error);
+                this.onError('Connection error');
+            };
+            
+        } catch (error) {
+            console.error('Failed to connect WebSocket:', error);
+            this.onError('Failed to connect to audio service');
+        }
+    }
+    
+    async startRecording() {
+        if (!this.audioStream || this.isRecording) {
+            return;
+        }
+        
+        try {
+            // Set up MediaRecorder with WebM/Opus format
+            const options = {
+                mimeType: 'audio/webm;codecs=opus',
+                audioBitsPerSecond: 32000
+            };
+            
+            this.mediaRecorder = new MediaRecorder(this.audioStream, options);
+            this.sequenceNumber = 0;
+            
+            this.mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0 && this.isConnected) {
+                    this.sendAudioChunk(event.data);
+                }
+            };
+            
+            this.mediaRecorder.onstart = () => {
+                console.log('Recording started');
+                this.isRecording = true;
+                this.onStatusChange('recording');
+                
+                // Send audio start event
+                this.sendWebSocketMessage({
+                    type: 'audio.start',
+                    sample_rate: this.sampleRate,
+                    channels: this.channels,
+                    format: 'webm'
+                });
+            };
+            
+            this.mediaRecorder.onstop = () => {
+                console.log('Recording stopped');
+                this.isRecording = false;
+                this.onStatusChange('processing');
+                
+                // Send audio end event
+                this.sendWebSocketMessage({
+                    type: 'audio.end'
+                });
+            };
+            
+            // Start recording with small chunks for real-time processing
+            this.mediaRecorder.start(100); // 100ms chunks
+            
+        } catch (error) {
+            console.error('Failed to start recording:', error);
+            this.onError('Failed to start recording');
+        }
+    }
+    
+    stopRecording() {
+        if (this.mediaRecorder && this.isRecording) {
+            this.mediaRecorder.stop();
+        }
+    }
+    
+    async sendAudioChunk(audioBlob) {
+        try {
+            // Convert blob to base64
+            const arrayBuffer = await audioBlob.arrayBuffer();
+            const base64Audio = this.arrayBufferToBase64(arrayBuffer);
+            
+            // Send audio chunk via WebSocket
+            this.sendWebSocketMessage({
+                type: 'audio.chunk',
+                audio_data: base64Audio,
+                sequence: this.sequenceNumber++
+            });
+            
+        } catch (error) {
+            console.error('Failed to send audio chunk:', error);
+        }
+    }
+    
+    sendWebSocketMessage(message) {
+        if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
+            this.websocket.send(JSON.stringify(message));
+        }
+    }
+    
+    handleWebSocketMessage(message) {
+        switch (message.type) {
+            case 'transcription.partial':
+                this.onTranscription(message.text, false);
+                break;
+                
+            case 'transcription.final':
+                this.onTranscription(message.text, true);
+                break;
+                
+            case 'speech.start':
+                this.onSpeechStart(message.text);
+                this.audioQueue = []; // Clear previous audio
+                break;
+                
+            case 'speech.chunk':
+                this.queueAudioChunk(message.audio_data);
+                break;
+                
+            case 'speech.end':
+                this.onSpeechEnd();
+                break;
+                
+            case 'error':
+                this.onError(message.error);
+                break;
+                
+            case 'status':
+                this.onStatusChange(message.status);
+                break;
+                
+            default:
+                console.log('Unknown message type:', message.type);
+        }
+    }
+    
+    async queueAudioChunk(base64Audio) {
+        try {
+            // Decode base64 audio
+            const audioData = this.base64ToArrayBuffer(base64Audio);
+            
+            // Add to queue
+            this.audioQueue.push(audioData);
+            
+            // Start playback if not already playing
+            if (!this.isPlaying) {
+                this.playAudioQueue();
+            }
+            
+        } catch (error) {
+            console.error('Failed to queue audio chunk:', error);
+        }
+    }
+    
+    async playAudioQueue() {
+        if (this.isPlaying || this.audioQueue.length === 0) {
+            return;
+        }
+        
+        this.isPlaying = true;
+        
+        try {
+            // Concatenate all audio chunks
+            const totalLength = this.audioQueue.reduce((sum, chunk) => sum + chunk.byteLength, 0);
+            const combinedAudio = new Uint8Array(totalLength);
+            
+            let offset = 0;
+            for (const chunk of this.audioQueue) {
+                combinedAudio.set(new Uint8Array(chunk), offset);
+                offset += chunk.byteLength;
+            }
+            
+            // Create audio blob and play
+            const audioBlob = new Blob([combinedAudio], { type: 'audio/ogg; codecs=opus' });
+            const audioUrl = URL.createObjectURL(audioBlob);
+            const audio = new Audio(audioUrl);
+            
+            audio.onended = () => {
+                this.isPlaying = false;
+                URL.revokeObjectURL(audioUrl);
+            };
+            
+            audio.onerror = (error) => {
+                console.error('Audio playback error:', error);
+                this.isPlaying = false;
+                URL.revokeObjectURL(audioUrl);
+            };
+            
+            await audio.play();
+            
+        } catch (error) {
+            console.error('Failed to play audio:', error);
+            this.isPlaying = false;
+        }
+    }
+    
+    // Utility functions
+    arrayBufferToBase64(buffer) {
+        const bytes = new Uint8Array(buffer);
+        let binary = '';
+        for (let i = 0; i < bytes.byteLength; i++) {
+            binary += String.fromCharCode(bytes[i]);
+        }
+        return btoa(binary);
+    }
+    
+    base64ToArrayBuffer(base64) {
+        const binaryString = atob(base64);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+        }
+        return bytes.buffer;
+    }
+    
+    // Voice Activity Detection (simple implementation)
+    detectVoiceActivity(audioData) {
+        // Calculate RMS (Root Mean Square) for volume detection
+        let sum = 0;
+        const samples = new Float32Array(audioData);
+        
+        for (let i = 0; i < samples.length; i++) {
+            sum += samples[i] * samples[i];
+        }
+        
+        const rms = Math.sqrt(sum / samples.length);
+        return rms > 0.01; // Threshold for voice activity
+    }
+    
+    async disconnect() {
+        this.stopRecording();
+        
+        if (this.websocket) {
+            this.websocket.close();
+            this.websocket = null;
+        }
+        
+        if (this.audioStream) {
+            this.audioStream.getTracks().forEach(track => track.stop());
+            this.audioStream = null;
+        }
+        
+        if (this.audioContext) {
+            await this.audioContext.close();
+            this.audioContext = null;
+        }
+        
+        this.isConnected = false;
+        this.isRecording = false;
+        this.isPlaying = false;
+    }
+}
