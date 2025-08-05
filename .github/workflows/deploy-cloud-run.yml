@@ -31,6 +31,16 @@ jobs:
           echo EOF
         } >> $GITHUB_ENV
 
+    - name: Debug credentials
+      run: |
+        echo "Checking if credentials were set..."
+        if [ -n "$GCP_CREDENTIALS_JSON" ]; then
+          echo "✅ Credentials environment variable is set"
+          echo "Preview: $(echo "$GCP_CREDENTIALS_JSON" | head -c 100)..."
+        else
+          echo "❌ Credentials environment variable is NOT set"
+        fi
+
     - name: Google Auth
       id: auth
       uses: 'google-github-actions/auth@v2'
