@@ -41,7 +41,7 @@ jobs:
     - name: Build and Push Container
       run: |
         cd chatcal-ai
-        docker build -t gcr.io/$PROJECT_ID/$SERVICE:$GITHUB_SHA .
+        docker build -f Dockerfile.quick -t gcr.io/$PROJECT_ID/$SERVICE:$GITHUB_SHA .
         docker push gcr.io/$PROJECT_ID/$SERVICE:$GITHUB_SHA
 
     - name: Deploy to Cloud Run
@@ -54,6 +54,7 @@ jobs:
           --set-env-vars="GOOGLE_CLIENT_ID=432729289953-1di05ajntobgvv0aakgjahnrtp60491j.apps.googleusercontent.com,MY_EMAIL_ADDRESS=pgits.job@gmail.com,MY_PHONE_NUMBER=555-123-4567,SMTP_USERNAME=pgits.job@gmail.com,ENVIRONMENT=production,TESTING_MODE=false" \
           --update-secrets="GROQ_API_KEY=groq-api-key:latest,GOOGLE_CLIENT_SECRET=google-client-secret:latest,SMTP_PASSWORD=smtp-password:latest,SECRET_KEY=secret-key:latest" \
           --timeout=300 \
+          --port=8080 \
           --max-instances=5
 
     - name: Show URL
