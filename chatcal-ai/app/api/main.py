@@ -397,8 +397,8 @@ async def google_auth_login(request: Request, state: Optional[str] = None):
 async def google_auth_callback(request: Request, code: str, state: str):
     """Handle Google OAuth callback."""
     try:
-        # Reconstruct the authorization response URL
-        authorization_response = str(request.url)
+        # Reconstruct the authorization response URL with HTTPS
+        authorization_response = str(request.url).replace("http://", "https://", 1)
         
         # Exchange code for credentials
         credentials = calendar_auth.handle_callback(authorization_response, state)
