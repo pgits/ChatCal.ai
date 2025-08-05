@@ -66,13 +66,22 @@ class CalendarAuth:
     
     def handle_callback(self, authorization_response: str, state: str) -> Credentials:
         """Handle OAuth2 callback and exchange code for credentials."""
-        flow = self.create_auth_flow(state)
-        flow.fetch_token(authorization_response=authorization_response)
-        
-        credentials = flow.credentials
-        self.save_credentials(credentials)
-        
-        return credentials
+        try:
+            flow = self.create_auth_flow(state)
+            flow.fetch_token(authorization_response=authorization_response)
+            
+            credentials = flow.credentials
+            self.save_credentials(credentials)
+            
+            return credentials
+        except Exception as e:
+            # Log the exact error for debugging
+            import logging
+            logging.error(f"OAuth token exchange failed: {str(e)}")
+            logging.error(f"Authorization response: {authorization_response}")
+            logging.error(f"Client ID: {self.client_id}")
+            logging.error(f"Redirect URI: {self.redirect_uri}")
+            raise
     
     def save_credentials(self, credentials: Credentials):
         """Save credentials to file for future use."""
