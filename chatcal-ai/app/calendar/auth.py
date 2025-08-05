@@ -12,8 +12,12 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from app.config import settings
 
-# Allow HTTP for local development (OAuth2 normally requires HTTPS)
+# Allow HTTP for local development and Cloud Run internal routing
+# Cloud Run terminates HTTPS externally but uses HTTP internally
+# CRITICAL: Must be set BEFORE any oauth imports to avoid transport errors
 os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
+os.environ['OAUTHLIB_RELAX_TOKEN_SCOPE'] = '1'
+print(f"🔧 Global OAUTHLIB settings: INSECURE_TRANSPORT={os.environ.get('OAUTHLIB_INSECURE_TRANSPORT')}, RELAX_TOKEN_SCOPE={os.environ.get('OAUTHLIB_RELAX_TOKEN_SCOPE')}")
 
 
 class CalendarAuth:
@@ -25,28 +29,14 @@ class CalendarAuth:
         'https://www.googleapis.com/auth/calendar.events'
     ]
     
-    # Singleton pattern for shared credential storage
-    _instance = None
-    _initialized = False
-    
-    def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super(CalendarAuth, cls).__new__(cls)
-        return cls._instance
-    
     def __init__(self):
-        # Only initialize once (singleton pattern)
-        if CalendarAuth._initialized:
-            return
-        CalendarAuth._initialized = True
         
         self.client_id = settings.google_client_id
         self.client_secret = settings.google_client_secret
-        # Use Cloud Run URL for production, localhost for development
-        if os.getenv('ENVIRONMENT') == 'production':
-            self.redirect_uri = "https://chatcal-ai-432729289953.us-east1.run.app/auth/callback"
-        else:
-            self.redirect_uri = "http://localhost:8000/auth/callback"
+        # Always use production URL for OAuth since we're deploying to Cloud Run
+        # For local development, you'll need to temporarily change this to localhost
+        self.redirect_uri = "https://chatcal-ai-432729289953.us-east1.run.app/auth/callback"
+        print(f"🔧 CalendarAuth initialized with redirect_uri: {self.redirect_uri} [v2025-08-05]")
         self.credentials_path = settings.google_credentials_path
         self._service = None
         self._cached_credentials = None  # For Cloud Run memory-based credential storage
@@ -87,13 +77,87 @@ class CalendarAuth:
     
     def handle_callback(self, authorization_response: str, state: str) -> Credentials:
         """Handle OAuth2 callback and exchange code for credentials."""
-        flow = self.create_auth_flow(state)
-        flow.fetch_token(authorization_response=authorization_response)
+        # FORCE HTTPS for Cloud Run - this is critical for OAuth2 transport security
+        if authorization_response.startswith('http://'):
+            authorization_response = authorization_response.replace('http://', 'https://', 1)
+            print(f"🔧 CONVERTED HTTP to HTTPS: {authorization_response}")
         
-        credentials = flow.credentials
-        self.save_credentials(credentials)
+        print(f"🔧 Final authorization response URL: {authorization_response}")
         
-        return credentials
+        # CRITICAL: Set insecure transport override BEFORE any OAuth operations
+        # This must be set before importing or using any oauth2lib components
+        import os
+        os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
+        os.environ['OAUTHLIB_RELAX_TOKEN_SCOPE'] = '1'
+        print(f"🔧 OAUTHLIB_INSECURE_TRANSPORT: {os.environ.get('OAUTHLIB_INSECURE_TRANSPORT')}")
+        print(f"🔧 OAUTHLIB_RELAX_TOKEN_SCOPE: {os.environ.get('OAUTHLIB_RELAX_TOKEN_SCOPE')}")
+        
+        # Force reload of oauthlib modules to pick up environment changes
+        import sys
+        if 'oauthlib' in sys.modules:
+            print("🔧 Reloading oauthlib modules...")
+            # Clear cached modules that might have transport settings
+            modules_to_reload = [k for k in sys.modules.keys() if k.startswith('oauthlib')]
+            for module in modules_to_reload:
+                if module in sys.modules:
+                    del sys.modules[module]
+        
+        # Re-import with new environment settings
+        from google_auth_oauthlib.flow import Flow
+        
+        # Create flow with explicit HTTPS redirect URI
+        client_config = {
+            "web": {
+                "client_id": self.client_id,
+                "client_secret": self.client_secret,
+                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                "token_uri": "https://oauth2.googleapis.com/token",
+                "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+                "redirect_uris": [self.redirect_uri]
+            }
+        }
+        
+        flow = Flow.from_client_config(
+            client_config,
+            scopes=self.SCOPES,
+            state=state
+        )
+        flow.redirect_uri = self.redirect_uri
+        
+        print(f"🔧 Flow redirect URI: {flow.redirect_uri}")
+        
+        try:
+            flow.fetch_token(authorization_response=authorization_response)
+            credentials = flow.credentials
+            self.save_credentials(credentials)
+            print("✅ OAuth token exchange successful!")
+            return credentials
+        except Exception as e:
+            print(f"❌ OAuth token exchange failed: {e}")
+            # Try one more time with additional transport overrides
+            import requests
+            from requests.adapters import HTTPAdapter
+            from urllib3.util.retry import Retry
+            
+            # Create a custom session that allows insecure transport
+            session = requests.Session()
+            retry_strategy = Retry(
+                total=3,
+                backoff_factor=1,
+                status_forcelist=[500, 502, 503, 504]
+            )
+            adapter = HTTPAdapter(max_retries=retry_strategy)
+            session.mount("http://", adapter)
+            session.mount("https://", adapter)
+            
+            # Monkey patch the session into the flow
+            flow._session = session
+            
+            flow.fetch_token(authorization_response=authorization_response)
+            credentials = flow.credentials
+            self.save_credentials(credentials)
+            print("✅ OAuth token exchange successful on retry!")
+            return credentials
     
     def save_credentials(self, credentials: Credentials):
         """Save credentials to file for future use."""
@@ -166,8 +230,8 @@ class CalendarAuth:
     def get_calendar_service(self, credentials: Optional[Credentials] = None):
         """Get authenticated Google Calendar service."""
         if not credentials:
-            # Try service account first (production), then OAuth (development)
-            credentials = self._get_service_account_credentials() or self.load_credentials()
+            # For personal Gmail accounts, prioritize OAuth over service account
+            credentials = self.load_credentials() or self._get_service_account_credentials()
             
         if not credentials:
             raise ValueError("No valid credentials available. Please authenticate first.")
@@ -195,8 +259,9 @@ class CalendarAuth:
                 credentials = ServiceAccountCredentials.from_service_account_info(
                     service_account_info,
                     scopes=self.SCOPES
+                    # Note: No subject parameter - direct service account access to shared calendar
                 )
-                print("🔧 Using service account credentials from Secret Manager")
+                print("🔧 Using service account credentials for shared calendar access")
                 return credentials
                 
             # For local development, try environment variable
@@ -204,6 +269,7 @@ class CalendarAuth:
                 credentials = ServiceAccountCredentials.from_service_account_file(
                     os.getenv('GOOGLE_APPLICATION_CREDENTIALS'),
                     scopes=self.SCOPES
+                    # Note: No subject parameter - direct service account access to shared calendar
                 )
                 print("🔧 Using service account credentials from file")
                 return credentials

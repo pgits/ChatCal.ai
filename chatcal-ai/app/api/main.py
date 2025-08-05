@@ -1,5 +1,11 @@
 """Main FastAPI application for ChatCal.ai."""
 
+import os
+# CRITICAL: Set OAuth environment variables BEFORE any imports
+os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
+os.environ['OAUTHLIB_RELAX_TOKEN_SCOPE'] = '1'
+print(f"🔧 MAIN: OAuth environment set - INSECURE_TRANSPORT={os.environ.get('OAUTHLIB_INSECURE_TRANSPORT')}")
+
 from fastapi import FastAPI, HTTPException, Depends, Request, status, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse
@@ -420,8 +426,27 @@ async def google_auth_login(request: Request, state: Optional[str] = None):
 async def google_auth_callback(request: Request, code: str, state: str):
     """Handle Google OAuth callback."""
     try:
-        # Reconstruct the authorization response URL
-        authorization_response = str(request.url)
+        # SUPER AGGRESSIVE: Set environment variables again at callback time
+        os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
+        os.environ['OAUTHLIB_RELAX_TOKEN_SCOPE'] = '1'
+        print(f"🔧 CALLBACK: Re-setting OAuth environment variables")
+        
+        # Reconstruct the authorization response URL with HTTPS for Cloud Run
+        # Cloud Run terminates HTTPS externally but forwards HTTP internally
+        url = str(request.url)
+        print(f"🔧 Original callback URL: {url}")
+        
+        # ALWAYS force HTTPS regardless of the URL
+        if 'chatcal-ai-432729289953.us-east1.run.app' in url:
+            authorization_response = url.replace('http://', 'https://', 1)
+        else:
+            authorization_response = url
+            
+        # Double-check HTTPS conversion
+        if not authorization_response.startswith('https://'):
+            authorization_response = authorization_response.replace('http://', 'https://', 1)
+        
+        print(f"🔧 Final OAuth callback URL: {authorization_response}")
         
         # Exchange code for credentials
         credentials = calendar_auth.handle_callback(authorization_response, state)
@@ -432,6 +457,10 @@ async def google_auth_callback(request: Request, code: str, state: str):
             "expires_at": credentials.expiry.isoformat() if credentials.expiry else None
         }
     except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"❌ OAuth callback error: {e}")
+        print(f"❌ Full traceback: {error_details}")
         raise HTTPException(status_code=400, detail=f"Authentication failed: {str(e)}")
 
 
@@ -481,6 +510,40 @@ async def general_exception_handler(request: Request, exc: Exception):
         }
     )
 
+
+@app.get("/debug/calendar")
+async def debug_calendar():
+    """Debug calendar service authentication."""
+    try:
+        from app.calendar.auth import CalendarAuth
+        
+        auth = CalendarAuth()
+        
+        # Test Secret Manager availability
+        secret_manager_available = False
+        try:
+            from google.cloud import secretmanager
+            secret_manager_available = True
+        except ImportError as e:
+            secret_manager_available = f"Import failed: {e}"
+        
+        # Test service account credentials
+        service_account_available = False
+        try:
+            service_creds = auth._get_service_account_credentials()
+            service_account_available = service_creds is not None
+        except Exception as e:
+            service_account_available = f"Failed: {e}"
+        
+        return {
+            "environment": os.getenv('ENVIRONMENT', 'development'),
+            "secret_manager_available": secret_manager_available,
+            "service_account_available": service_account_available,
+            "is_authenticated": auth.is_authenticated(),
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        return {"error": str(e), "timestamp": datetime.now().isoformat()}
 
 if __name__ == "__main__":
     import uvicorn
