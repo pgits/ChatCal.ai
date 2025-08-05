@@ -94,9 +94,15 @@ class CalendarAuth:
             )
             
             if response.status_code != 200:
-                raise Exception(f"Token exchange failed: {response.text}")
+                import logging
+                logging.error(f"Token exchange HTTP status: {response.status_code}")
+                logging.error(f"Token exchange response: {response.text}")
+                raise Exception(f"Token exchange failed with status {response.status_code}: {response.text}")
             
             token_info = response.json()
+            
+            import logging
+            logging.info(f"Token exchange successful! Received: {list(token_info.keys())}")
             
             # Create credentials object manually
             credentials = Credentials(
