@@ -25,11 +25,17 @@ jobs:
     - name: Setup Google Application Credentials
       run: |
         echo "${{ secrets.GCP_SA_KEY_BASE64 }}" | base64 -d > /tmp/gcp-key.json
-        echo "GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcp-key.json" >> $GITHUB_ENV
+        {
+          echo 'GCP_CREDENTIALS_JSON<<EOF'
+          cat /tmp/gcp-key.json
+          echo EOF
+        } >> $GITHUB_ENV
 
     - name: Google Auth
       id: auth
       uses: 'google-github-actions/auth@v2'
+      with:
+        credentials_json: '${{ env.GCP_CREDENTIALS_JSON }}'
 
     - name: Set up Cloud SDK
       uses: 'google-github-actions/setup-gcloud@v2'
