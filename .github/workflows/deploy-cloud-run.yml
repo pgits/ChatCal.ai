@@ -22,11 +22,14 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
 
+    - name: Setup Google Application Credentials
+      run: |
+        echo "${{ secrets.GCP_SA_KEY_BASE64 }}" | base64 -d > /tmp/gcp-key.json
+        echo "GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcp-key.json" >> $GITHUB_ENV
+
     - name: Google Auth
       id: auth
       uses: 'google-github-actions/auth@v2'
-      with:
-        credentials_json: ${{ secrets.GCP_SA_KEY }}
 
     - name: Set up Cloud SDK
       uses: 'google-github-actions/setup-gcloud@v2'
