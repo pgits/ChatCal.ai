@@ -431,6 +431,7 @@ async def auth_status():
         }
 
 
+
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
     """Custom HTTP exception handler."""
