@@ -177,12 +177,20 @@ async def health_check():
     """Health check endpoint."""
     services = {}
     
-    # Check Redis connection
+    # Check session storage (Redis or in-memory fallback)
     try:
-        session_manager.redis_client.ping()
-        services["database"] = "healthy"
+        # Test session creation to verify session storage is working
+        test_session = session_manager.create_session({"test": True})
+        if test_session and session_manager.get_session(test_session):
+            session_manager.delete_session(test_session)
+            if session_manager.redis_available:
+                services["database"] = "healthy"
+            else:
+                services["database"] = "healthy_fallback"  # Working with in-memory
+        else:
+            services["database"] = "unhealthy"
     except Exception as e:
-        logger.error(f"Redis health check failed: {e}")
+        logger.error(f"Session storage health check failed: {e}")
         services["database"] = "unhealthy"
     
     # Check Groq LLM (via anthropic_llm interface)
