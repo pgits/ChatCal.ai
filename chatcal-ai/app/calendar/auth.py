@@ -87,6 +87,10 @@ class CalendarAuth:
                 'redirect_uri': self.redirect_uri
             }
             
+            import logging
+            logging.info(f"Token exchange parameters: client_id={self.client_id[:20]}..., code={auth_code[:20]}..., redirect_uri={self.redirect_uri}")
+            logging.info(f"Client secret length: {len(self.client_secret)}")
+            
             response = requests.post(
                 'https://oauth2.googleapis.com/token',
                 data=token_data,
