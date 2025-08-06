@@ -969,12 +969,12 @@ class ChatCalAgent:
                         extracted['phone'] = phone_digits
                         break
         
-        # Name pattern (various formats)
+        # Name pattern (various formats) - improved to stop at common continuation words
         name_patterns = [
-            r"my name is ([A-Za-z\s]{2,30})",
-            r"i'm ([A-Za-z\s]{2,30})",
-            r"this is ([A-Za-z\s]{2,30})",
-            r"i am ([A-Za-z\s]{2,30})",
+            r"my name is ([A-Za-z\s]{2,30?})(?:\s+and\s|\s*,|\s+email|\s+phone|\.|$)",
+            r"i'm ([A-Za-z\s]{2,30?})(?:\s+and\s|\s*,|\s+email|\s+phone|\.|$)",
+            r"this is ([A-Za-z\s]{2,30?})(?:\s+and\s|\s*,|\s+email|\s+phone|\.|$)",
+            r"i am ([A-Za-z\s]{2,30?})(?:\s+and\s|\s*,|\s+email|\s+phone|\.|$)",
             r"(?:^|\s)([A-Z][a-z]+(?:\s[A-Z][a-z]+)*),?\s+(?:here|speaking|calling)"  # "Betty, here" or "John Smith calling"
         ]
         
