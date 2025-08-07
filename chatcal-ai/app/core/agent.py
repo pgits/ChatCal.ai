@@ -284,8 +284,10 @@ class ChatCalAgent:
                     if availability_tool:
                         print(f"🔧 Calling availability tool with date: {date_found}")
                         result = availability_tool.call(date_string=date_found, duration_minutes=60)
-                        print(f"✅ Availability tool result: {result[:100]}...")
-                        return result
+                        # Extract content from ToolOutput object
+                        result_content = result.content if hasattr(result, 'content') else str(result)
+                        print(f"✅ Availability tool result: {result_content[:100]}...")
+                        return result_content
                 except Exception as e:
                     return f"Could not check availability: {str(e)}"
         
@@ -378,8 +380,10 @@ class ChatCalAgent:
                     if availability_tool:
                         try:
                             result = availability_tool.call(date_string=date_found, duration_minutes=duration)
-                            print(f"✅ Availability result: {result[:100]}...")
-                            return result
+                            # Extract content from ToolOutput object
+                            result_content = result.content if hasattr(result, 'content') else str(result)
+                            print(f"✅ Availability result: {result_content[:100]}...")
+                            return result_content
                         except Exception as e:
                             print(f"❌ Availability check failed: {e}")
                             return f"I'm having trouble checking Peter's calendar for {date_found}. Could you try specifying a time, or try again?"
