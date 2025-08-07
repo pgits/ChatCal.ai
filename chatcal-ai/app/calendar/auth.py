@@ -2,6 +2,7 @@
 
 import os
 import json
+import redis
 from typing import Optional, Dict
 from datetime import datetime, timedelta
 from google.auth.transport.requests import Request
@@ -29,6 +30,14 @@ class CalendarAuth:
         self.redirect_uri = "https://chatcal-ai-imoco2uwrq-ue.a.run.app/auth/callback"
         self.credentials_path = settings.google_credentials_path
         self._service = None
+        
+        # Redis client for persistent credential storage
+        try:
+            self.redis_client = redis.from_url(settings.redis_url)
+            self.use_redis = True
+        except:
+            self.redis_client = None
+            self.use_redis = False
     
     def create_auth_flow(self, state: Optional[str] = None) -> Flow:
         """Create OAuth2 flow for authentication."""
@@ -135,9 +144,7 @@ class CalendarAuth:
             raise
     
     def save_credentials(self, credentials: Credentials):
-        """Save credentials to file for future use."""
-        os.makedirs(os.path.dirname(self.credentials_path), exist_ok=True)
-        
+        """Save credentials to Redis (persistent) or file (fallback)."""
         creds_data = {
             'token': credentials.token,
             'refresh_token': credentials.refresh_token,
@@ -148,16 +155,54 @@ class CalendarAuth:
             'expiry': credentials.expiry.isoformat() if credentials.expiry else None
         }
         
-        with open(self.credentials_path, 'w') as f:
-            json.dump(creds_data, f)
+        # Primary storage: Redis (persistent across container restarts)
+        if self.use_redis and self.redis_client:
+            try:
+                # Store with 30-day expiration for security (but refresh token should keep it alive)
+                self.redis_client.setex(
+                    'google_calendar_credentials',
+                    30 * 24 * 60 * 60,  # 30 days in seconds
+                    json.dumps(creds_data)
+                )
+                print("✅ Credentials saved to Redis (persistent storage)")
+                return
+            except Exception as e:
+                print(f"❌ Failed to save to Redis: {e}")
+        
+        # Fallback storage: Local file (temporary)
+        try:
+            os.makedirs(os.path.dirname(self.credentials_path), exist_ok=True)
+            with open(self.credentials_path, 'w') as f:
+                json.dump(creds_data, f)
+            print("✅ Credentials saved to local file (temporary)")
+        except Exception as e:
+            print(f"❌ Failed to save credentials: {e}")
     
     def load_credentials(self) -> Optional[Credentials]:
-        """Load saved credentials from file."""
-        if not os.path.exists(self.credentials_path):
-            return None
+        """Load saved credentials from Redis (persistent) or file (fallback)."""
+        creds_data = None
         
-        with open(self.credentials_path, 'r') as f:
-            creds_data = json.load(f)
+        # Primary storage: Try Redis first (persistent)
+        if self.use_redis and self.redis_client:
+            try:
+                redis_data = self.redis_client.get('google_calendar_credentials')
+                if redis_data:
+                    creds_data = json.loads(redis_data.decode('utf-8'))
+                    print("✅ Credentials loaded from Redis (persistent storage)")
+            except Exception as e:
+                print(f"❌ Failed to load from Redis: {e}")
+        
+        # Fallback storage: Try local file
+        if not creds_data and os.path.exists(self.credentials_path):
+            try:
+                with open(self.credentials_path, 'r') as f:
+                    creds_data = json.load(f)
+                print("✅ Credentials loaded from local file")
+            except Exception as e:
+                print(f"❌ Failed to load from file: {e}")
+        
+        if not creds_data:
+            return None
         
         credentials = Credentials(
             token=creds_data['token'],
@@ -172,10 +217,17 @@ class CalendarAuth:
         if creds_data.get('expiry'):
             credentials.expiry = datetime.fromisoformat(creds_data['expiry'])
         
-        # Refresh if expired
+        # Refresh if expired and we have refresh token
         if credentials.expired and credentials.refresh_token:
-            credentials.refresh(Request())
-            self.save_credentials(credentials)
+            try:
+                print("🔄 Refreshing expired credentials...")
+                credentials.refresh(Request())
+                # Save refreshed credentials back to storage
+                self.save_credentials(credentials)
+                print("✅ Credentials refreshed and saved")
+            except Exception as e:
+                print(f"❌ Failed to refresh credentials: {e}")
+                return None
         
         return credentials
     
@@ -193,7 +245,7 @@ class CalendarAuth:
         return self._service
     
     def revoke_credentials(self):
-        """Revoke stored credentials."""
+        """Revoke stored credentials from all storage locations."""
         credentials = self.load_credentials()
         if credentials:
             try:
@@ -201,9 +253,18 @@ class CalendarAuth:
             except:
                 pass  # Ignore revocation errors
         
+        # Remove from Redis
+        if self.use_redis and self.redis_client:
+            try:
+                self.redis_client.delete('google_calendar_credentials')
+                print("✅ Credentials removed from Redis")
+            except Exception as e:
+                print(f"❌ Failed to remove from Redis: {e}")
+        
         # Remove credentials file
         if os.path.exists(self.credentials_path):
             os.remove(self.credentials_path)
+            print("✅ Credentials removed from local file")
         
         self._service = None
     
