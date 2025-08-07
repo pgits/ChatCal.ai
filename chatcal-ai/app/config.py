@@ -40,6 +40,13 @@ class Settings(BaseSettings):
     # Timezone
     default_timezone: str = Field(default="America/New_York", env="DEFAULT_TIMEZONE")
     
+    # Working Hours Configuration
+    weekday_start_time: str = Field(default="07:30", env="WEEKDAY_START_TIME")
+    weekday_end_time: str = Field(default="18:30", env="WEEKDAY_END_TIME")
+    weekend_start_time: str = Field(default="10:30", env="WEEKEND_START_TIME")
+    weekend_end_time: str = Field(default="16:30", env="WEEKEND_END_TIME")
+    working_hours_timezone: str = Field(default="America/New_York", env="WORKING_HOURS_TIMEZONE")
+    
     # Chat Settings
     max_conversation_history: int = Field(default=20, env="MAX_CONVERSATION_HISTORY")
     session_timeout_minutes: int = Field(default=30, env="SESSION_TIMEOUT_MINUTES")

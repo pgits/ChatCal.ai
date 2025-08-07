@@ -8,6 +8,7 @@ from app.calendar.utils import DateTimeParser, CalendarFormatter
 from app.personality.prompts import BOOKING_CONFIRMATIONS, ERROR_RESPONSES
 from app.core.email_service import email_service
 from app.config import settings
+from app.core.working_hours import working_hours_validator
 import random
 
 
@@ -58,8 +59,19 @@ class CalendarTools:
                 duration_minutes=duration_minutes
             )
             
+            # Filter slots to only include working hours
+            working_hours_slots = []
+            for start_time, end_time in slots:
+                is_valid, _ = working_hours_validator.is_within_working_hours(start_time)
+                if is_valid:
+                    working_hours_slots.append((start_time, end_time))
+            
+            slots = working_hours_slots
+            
             if not slots:
-                return f"Unfortunately, I don't see any available {self.formatter.format_duration(duration_minutes)} slots on {self.formatter.format_datetime(target_date, include_date=False)}. Would you like to try a different day?"
+                # Provide working hours context if no slots available
+                suggested_times = working_hours_validator.get_suggested_times(target_date)
+                return f"Unfortunately, I don't see any available {self.formatter.format_duration(duration_minutes)} slots during Pete's business hours on {self.formatter.format_datetime(target_date, include_date=False)}. {suggested_times}"
             
             # Filter by preferred time if specified
             if preferred_time:
@@ -129,6 +141,11 @@ class CalendarTools:
                 return "Are you trying to trick me, just because I am an AI bot? Not this time! 😏 Please choose a future date and time for your meeting."
             elif start_time <= now:
                 print(f"🔍 DEBUG: Allowing booking within 15-minute grace period ({start_time})")
+            
+            # Check working hours before proceeding
+            is_valid, working_hours_error = working_hours_validator.is_within_working_hours(start_time)
+            if not is_valid:
+                return working_hours_error
             
             end_time = start_time + timedelta(minutes=duration_minutes)
             
