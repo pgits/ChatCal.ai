@@ -241,6 +241,7 @@ class ChatCalAgent:
         import re
         
         print(f"🔧 _check_and_call_tools called with message: '{message}'")
+        print(f"🚨 PRODUCTION CODE VERSION: commit 787a0f4 - SHOULD NOT PASS TO LLM")
         
         # Check for booking requests
         booking_patterns = [
