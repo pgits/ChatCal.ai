@@ -299,7 +299,7 @@ async def chat_widget(request: Request):
                 <input 
                     type="text" 
                     id="messageInput" 
-                    placeholder="Ask me to schedule a meeting, check availability, or manage your calendar..."
+                    placeholder="Ask me to schedule a meeting or check availability..."
                     maxlength="1000"
                 />
                 <button id="sendButton" type="button">
