@@ -33,7 +33,7 @@ from app.core.llm_gemini import gemini_llm
 app = FastAPI(
     title="ChatCal.ai",
     description="AI-powered calendar assistant for booking appointments",
-    version="0.1.4",
+    version="0.1.5",
     docs_url="/docs",
     redoc_url="/redoc"
 )
@@ -169,7 +169,7 @@ async def root():
             </div>
             
             <div style="text-align: center; margin-top: 30px; color: #888;">
-                <p>Version 0.1.4 | Built with FastAPI & LlamaIndex</p>
+                <p>Version 0.1.5 | Built with FastAPI & LlamaIndex</p>
             </div>
         </div>
     </body>
@@ -226,7 +226,7 @@ async def health_check():
     
     return HealthResponse(
         status=overall_status,
-        version="0.1.4",
+        version="0.1.5",
         timestamp=datetime.utcnow(),
         services=services
     )
@@ -270,7 +270,7 @@ async def get_version():
             healthy = False
         
         return VersionResponse(
-            app_version="0.1.4",
+            app_version="0.1.5",
             git_commit=git_commit,
             git_branch=git_branch,
             build_timestamp=datetime.utcnow(),
