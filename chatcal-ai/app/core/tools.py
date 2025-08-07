@@ -259,7 +259,7 @@ class CalendarTools:
             else:
                 email_status = "\n\n📧 If you'd like me to send you a calendar invitation via email, please provide your email address."
             
-            # Add Google Meet information if conference was created
+            # Add meeting format information (Google Meet vs Phone Call)
             meet_info = ""
             if create_meet_conference:
                 # Extract Meet link from the created event
@@ -272,6 +272,12 @@ class CalendarTools:
                         meet_info = "\n\n🎥 Google Meet conference call has been set up (link will be available in your calendar)."
                 else:
                     meet_info = "\n\n🎥 Google Meet conference call has been set up (link will be available in your calendar)."
+            else:
+                # This is a phone call - show contact information
+                if user_phone:
+                    meet_info = f"\n\n📞 Phone call scheduled. Peter will call you at: {user_phone}"
+                else:
+                    meet_info = f"\n\n📞 Phone call scheduled. You can reach Peter at: {settings.my_phone_number}"
             
             # Add meeting ID and email status with HTML formatting
             details_html = f"""
@@ -296,7 +302,7 @@ class CalendarTools:
             elif not user_email and not email_sent_to_peter:
                 email_html = '<div style="color: #ff9800; margin: 8px 0;"><strong>📧 Email issue</strong> but meeting is confirmed!</div>'
             
-            # Format Google Meet info
+            # Format meeting method info (Google Meet or Phone Call)
             meet_html = ""
             if create_meet_conference:
                 if 'conferenceData' in event and 'entryPoints' in event['conferenceData']:
@@ -308,6 +314,12 @@ class CalendarTools:
                         meet_html = '<div style="background: #e8f5e9; padding: 10px; border-radius: 6px; margin: 8px 0;"><strong>🎥 Google Meet set up</strong> (link in your calendar)</div>'
                 else:
                     meet_html = '<div style="background: #e8f5e9; padding: 10px; border-radius: 6px; margin: 8px 0;"><strong>🎥 Google Meet set up</strong> (link in your calendar)</div>'
+            else:
+                # This is a phone call
+                if user_phone:
+                    meet_html = f'<div style="background: #fff3e0; padding: 10px; border-radius: 6px; margin: 8px 0;"><strong>📞 Phone Call:</strong> Peter will call you at <strong>{user_phone}</strong></div>'
+                else:
+                    meet_html = f'<div style="background: #fff3e0; padding: 10px; border-radius: 6px; margin: 8px 0;"><strong>📞 Phone Call:</strong> You can reach Peter at <strong>{settings.my_phone_number}</strong></div>'
             
             return f"{confirmation}{details_html}{email_html}{meet_html}"
             
@@ -765,24 +777,60 @@ class CalendarTools:
             if "name" in missing:
                 return "I cannot book any appointment without your name. May I have your name?"
         
-        # Detect if user requests Google Meet conference
+        # Detect meeting type preference - phone call vs video/google meet
         create_meet = False
-        meet_keywords = ['google meet', 'meet', 'video call', 'video conference', 'online meeting', 'virtual meeting', 'conference call', 'zoom', 'online', 'remote']
         
-        # Check title and description for meet keywords
+        # Phone call keywords (always indicate phone preference)
+        phone_keywords = ['phone call', 'by phone', 'telephone', 'phone conversation', 'call me']
+        # Google Meet/video keywords (these take precedence over generic phone keywords)
+        meet_keywords = ['google meet', 'video call', 'video conference', 'online meeting', 'virtual meeting', 'conference call', 'zoom', 'online', 'remote', 'video', 'video meet']
+        # Generic keywords that could go either way
+        generic_keywords = ['phone', 'call']
+        
+        # Check title and description for keywords
         text_to_check = f"{title} {description or ''}".lower()
-        create_meet = any(keyword in text_to_check for keyword in meet_keywords)
         
-        # Also check recent conversation history for meet requests
-        if not create_meet and self.agent:
+        # Also check recent conversation history for meeting type preferences
+        recent_text = ""
+        if self.agent:
             try:
                 recent_messages = self.agent.get_conversation_history()
                 if recent_messages:
-                    # Check last few messages for meet-related keywords
+                    # Check last few messages for meeting type keywords
                     recent_text = ' '.join([msg.get('content', '') for msg in recent_messages[-3:] if msg.get('content')])
-                    create_meet = any(keyword in recent_text.lower() for keyword in meet_keywords)
             except:
                 pass  # If history access fails, continue without it
+        
+        # Combine current request and recent context
+        full_context = f"{text_to_check} {recent_text}".lower()
+        
+        # Check for explicit video/meet requests first (these take precedence)
+        wants_video_meet = any(keyword in full_context for keyword in meet_keywords)
+        
+        # Check for phone-specific keywords (these always indicate phone preference)
+        wants_phone_call = any(keyword in full_context for keyword in phone_keywords)
+        
+        # Check generic keywords only if no explicit preference found
+        if not wants_video_meet and not wants_phone_call:
+            has_generic_keywords = any(keyword in full_context for keyword in generic_keywords)
+            # Generic keywords lean toward phone call if user provided phone number
+            if has_generic_keywords and user_phone:
+                wants_phone_call = True
+        
+        # Decision logic: video/meet requests take precedence over phone requests
+        if wants_video_meet:
+            # Explicitly requested video/Google Meet (takes precedence)
+            create_meet = True
+        elif wants_phone_call:
+            # Explicitly requested phone call
+            create_meet = False
+        else:
+            # Smart default: if user provided phone number but didn't request video, default to phone call
+            # Otherwise default to Google Meet
+            if user_phone:
+                create_meet = False  # Phone call since they gave a phone number
+            else:
+                create_meet = True   # Google Meet as general default
         
         # Create appointment with user information
         return self.create_appointment(
