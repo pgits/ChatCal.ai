@@ -147,14 +147,20 @@ class SessionManager:
         
         # Return existing conversation if in memory
         if session_id in self.conversations:
+            print(f"🔄 SESSION DEBUG: Reusing existing conversation for session {session_id}")
+            existing_conv = self.conversations[session_id]
+            print(f"🔄 SESSION DEBUG: Existing user info: {existing_conv.agent.user_info}")
+            print(f"🔄 SESSION DEBUG: Conversation history length: {len(existing_conv.agent.memory.get_all())}")
             self.update_session(session_id, {"last_activity": datetime.utcnow().isoformat()})
-            return self.conversations[session_id]
+            return existing_conv
         
         # Create new conversation
+        print(f"🆕 SESSION DEBUG: Creating NEW conversation for session {session_id}")
         conversation = ConversationManager(
             session_id=session_id,
             max_history=settings.max_conversation_history
         )
+        print(f"🆕 SESSION DEBUG: New agent user info: {conversation.agent.user_info}")
         self.conversations[session_id] = conversation
         
         # Update session
