@@ -280,7 +280,7 @@ async def chat_widget(request: Request):
                 </div>
                 
                 <div class="quick-actions">
-                    <button class="quick-action" onclick="sendQuickMessage('Schedule a Google Meet with Peter')">🎥 Google Meet</button>
+                    <button class="quick-action" onclick="populateMessage('Schedule a Google Meet with Peter')">🎥 Google Meet</button>
                     <button class="quick-action" onclick="sendQuickMessage('Check Peter\\'s availability tomorrow')">📅 Check availability</button>
                     <button class="quick-action" onclick="sendQuickMessage('Schedule an in-person meeting')">🤝 In-person meeting</button>
                     <button class="quick-action" onclick="sendQuickMessage('/help')">❓ Help</button>
@@ -456,6 +456,11 @@ async def chat_widget(request: Request):
             function sendQuickMessage(message) {{
                 messageInput.value = message;
                 sendMessage();
+            }}
+            
+            function populateMessage(message) {{
+                messageInput.value = message;
+                messageInput.focus();
             }}
             
             // Event listeners
