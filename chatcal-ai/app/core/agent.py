@@ -249,6 +249,8 @@ class ChatCalAgent:
         """Check if message requires tool calls and execute them."""
         import re
         
+        print(f"🔧 _check_and_call_tools called with message: '{message}'")
+        
         # Check for booking requests
         booking_patterns = [
             r"schedule|book|appointment|meeting",
@@ -296,6 +298,9 @@ class ChatCalAgent:
         # Check for booking requests with complete info
         booking_keywords = ["schedule", "book", "appointment", "meeting", "meet", "googlemeet", "zoom", "call"]
         has_booking_keyword = any(word in message_lower for word in booking_keywords)
+        
+        print(f"🔍 PRODUCTION DEBUG: has_complete_user_info()={self.has_complete_user_info()}, has_booking_keyword={has_booking_keyword}")
+        print(f"🔍 PRODUCTION DEBUG: user_info={self.user_info}")
         
         if self.has_complete_user_info() and has_booking_keyword:
             try:
@@ -666,6 +671,7 @@ class ChatCalAgent:
                     except Exception as e:
                         return f"Could not cancel meeting: {str(e)}"
         
+        print(f"🔍 _check_and_call_tools returning empty - no conditions met")
         return ""
     
     def _extract_date(self, message_lower: str) -> str:
