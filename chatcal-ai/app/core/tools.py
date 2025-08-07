@@ -832,9 +832,26 @@ class CalendarTools:
             else:
                 create_meet = True   # Google Meet as general default
         
-        # Create appointment with user information
+        # Enhance title with user name and purpose for better calendar visibility
+        user_name = user_info.get('name', 'Guest')
+        enhanced_title = f"Meeting with {user_name}"
+        
+        # Add purpose/description to title if provided and different from generic meeting titles
+        if description and description.strip():
+            # Only add description if it's not just restating the meeting
+            generic_phrases = ['meeting', 'call', 'appointment', 'discussion', 'consultation']
+            desc_lower = description.lower().strip()
+            
+            # Check if description adds meaningful context
+            if not any(phrase in desc_lower and len(desc_lower) <= len(phrase) + 5 for phrase in generic_phrases):
+                enhanced_title += f" - {description.strip()}"
+        elif title and title.lower() not in ['meeting', 'appointment', 'call', 'consultation']:
+            # Use the original title if it's more specific than generic terms
+            enhanced_title += f" - {title}"
+        
+        # Create appointment with enhanced title
         return self.create_appointment(
-            title=title,
+            title=enhanced_title,
             date_string=date_string,
             time_string=time_string,
             duration_minutes=duration_minutes,
