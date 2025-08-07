@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "chatcal-ai"
-version = "0.1.7"
+version = "0.1.8"
 description = "A friendly AI chatbot for booking Google Calendar appointments"
 authors = ["Peter <pgits.job@gmail.com>"]
 
