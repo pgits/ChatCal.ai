@@ -10,12 +10,14 @@ from datetime import datetime
 import uuid
 import json
 import logging
+import subprocess
 from typing import Dict, Any, Optional
 
 from app.config import settings
 from app.api.models import (
     ChatRequest, ChatResponse, StreamChatResponse, SessionCreate, SessionResponse,
-    ConversationHistory, HealthResponse, ErrorResponse, AuthRequest, AuthResponse
+    ConversationHistory, HealthResponse, ErrorResponse, AuthRequest, AuthResponse,
+    VersionResponse
 )
 from app.api.chat_widget import router as chat_widget_router
 from app.api.simple_chat import router as simple_chat_router
@@ -225,6 +227,60 @@ async def health_check():
         timestamp=datetime.utcnow(),
         services=services
     )
+
+
+@app.get("/version", response_model=VersionResponse)
+async def get_version():
+    """Get application version and build information."""
+    try:
+        # Get git commit hash
+        try:
+            git_commit = subprocess.check_output(
+                ["git", "rev-parse", "HEAD"], 
+                text=True, 
+                timeout=5
+            ).strip()
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
+            git_commit = "unknown"
+        
+        # Get git branch
+        try:
+            git_branch = subprocess.check_output(
+                ["git", "rev-parse", "--abbrev-ref", "HEAD"], 
+                text=True, 
+                timeout=5
+            ).strip()
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
+            git_branch = "unknown"
+        
+        # Get Python version
+        import sys
+        python_version = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+        
+        # Determine if service is healthy (basic check)
+        healthy = True
+        try:
+            # Quick health check - test session creation
+            test_session = session_manager.create_session({"version_check": True})
+            session_manager.delete_session(test_session)
+        except Exception:
+            healthy = False
+        
+        return VersionResponse(
+            app_version="0.1.0",
+            git_commit=git_commit,
+            git_branch=git_branch,
+            build_timestamp=datetime.utcnow(),
+            environment=settings.app_env,
+            python_version=python_version,
+            healthy=healthy
+        )
+    except Exception as e:
+        logger.error(f"Version endpoint error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Version check failed: {str(e)}"
+        )
 
 
 @app.post("/sessions", response_model=SessionResponse)

@@ -114,3 +114,14 @@ class ErrorResponse(BaseModel):
     message: str = Field(..., description="Error message")
     details: Optional[Dict[str, Any]] = Field(None, description="Additional error details")
     timestamp: datetime = Field(..., description="Error timestamp")
+
+
+class VersionResponse(BaseModel):
+    """Version response model."""
+    app_version: str = Field(..., description="Application semantic version")
+    git_commit: str = Field(..., description="Git commit hash")
+    git_branch: str = Field(..., description="Git branch name")
+    build_timestamp: datetime = Field(..., description="Build timestamp")
+    environment: str = Field(..., description="Environment (development/production)")
+    python_version: str = Field(..., description="Python version")
+    healthy: bool = Field(..., description="Service health status")
