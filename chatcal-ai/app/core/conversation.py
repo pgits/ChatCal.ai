@@ -32,7 +32,9 @@ class ConversationManager:
             return special_response
         
         # Use the agent to handle the conversation
-        return self.agent.chat(user_input)
+        agent_response = self.agent.chat(user_input)
+        print(f"🔍 CONVERSATION DEBUG: Agent returned: '{agent_response[:100]}...'")
+        return agent_response
     
     def get_streaming_response(self, user_input: str):
         """Get a streaming response from the agent for the user input."""
