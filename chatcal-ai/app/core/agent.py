@@ -86,13 +86,28 @@ class ChatCalAgent:
     
     def _get_user_context(self) -> str:
         """Generate user context for the system prompt."""
+        user_details = []
+        if self.user_info.get("name"):
+            user_details.append(f"Name: {self.user_info['name']}")
+        if self.user_info.get("email"):
+            user_details.append(f"Email: {self.user_info['email']}")
+        if self.user_info.get("phone"):
+            user_details.append(f"Phone: {self.user_info['phone']}")
+            
         missing = []
         if not self.user_info.get("name"):
             missing.append("first name")
         if not self.user_info.get("email") and not self.user_info.get("phone"):
             missing.append("contact (email or phone)")
             
-        if missing:
+        if user_details:
+            context = f"## Known User Info:\n" + "\n".join(f"- {detail}" for detail in user_details)
+            if missing:
+                context += f"\n\n## Still Need: {', '.join(missing)}"
+            else:
+                context += "\n\n✅ Ready to book appointments!"
+            return context
+        elif missing:
             return f"## Missing Info: {', '.join(missing)}"
         else:
             return "## User Info: Complete - ready to book"
@@ -1032,6 +1047,10 @@ class ChatCalAgent:
             # Debug: Show current user info status
             if extracted_info:
                 print(f"👤 Current user info: {self.user_info}")
+            
+            # Additional debug for phone number specifically
+            if 'phone' in extracted_info:
+                print(f"📞 DEBUG: Phone number extracted and stored: {self.user_info.get('phone')}")
             
             # Start conversation if needed
             if not self.conversation_started:
