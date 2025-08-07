@@ -20,7 +20,7 @@ from app.api.models import (
     VersionResponse
 )
 from app.api.chat_widget import router as chat_widget_router
-from app.api.simple_chat import router as simple_chat_router
+# from app.api.simple_chat import router as simple_chat_router  # Temporarily disabled for deployment
 from app.core.session import session_manager
 from app.calendar.auth import CalendarAuth
 from app.core.exceptions import (
@@ -62,7 +62,7 @@ calendar_auth = CalendarAuth()
 
 # Include routers
 app.include_router(chat_widget_router)
-app.include_router(simple_chat_router)
+# app.include_router(simple_chat_router)  # Temporarily disabled for deployment
 
 
 # Global exception handlers
