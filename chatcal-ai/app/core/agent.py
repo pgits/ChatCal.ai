@@ -676,6 +676,9 @@ class ChatCalAgent:
             (r"tomorrow", "tomorrow"),
             (r"today", "today"),
             (r"tonight", "today"),  # "tonight" means today's date
+            (r"this\s+morning", "today"),  # "this morning" means today
+            (r"this\s+afternoon", "today"),  # "this afternoon" means today
+            (r"this\s+evening", "today"),  # "this evening" means today
             (r"monday|tuesday|wednesday|thursday|friday|saturday|sunday", None),
             (r"next\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)", None),
             (r"this\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)", None),
@@ -700,6 +703,8 @@ class ChatCalAgent:
             r"\d{1,2}:\d{2}\s*(?:am|pm)",
             r"\d{1,2}\s*(?:am|pm)",
             r"\d{1,2}:\d{2}",
+            r"in\s+the\s+(?:am|morning)",  # "in the am" or "in the morning"
+            r"in\s+the\s+(?:pm|afternoon|evening)",  # "in the pm" or "in the afternoon/evening"
             r"morning|afternoon|evening|noon|now"
         ]
         
@@ -716,6 +721,14 @@ class ChatCalAgent:
                     return "6:00 PM"
                 elif time_str == "noon":
                     return "12:00 PM"
+                elif "in the am" in time_str or "in the morning" in time_str:
+                    return "9:00 AM"  # Default morning time
+                elif "in the pm" in time_str:
+                    return "2:00 PM"  # Default afternoon time
+                elif "in the afternoon" in time_str:
+                    return "2:00 PM"
+                elif "in the evening" in time_str:
+                    return "6:00 PM"
                 elif time_str == "now":
                     # Get current time (round to next 15 minutes for practical scheduling)
                     from datetime import datetime, timedelta
