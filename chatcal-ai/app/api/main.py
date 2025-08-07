@@ -60,6 +60,9 @@ else:
 # Calendar auth instance
 calendar_auth = CalendarAuth()
 
+# Mount static files
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
 # Include routers
 app.include_router(chat_widget_router)
 # app.include_router(simple_chat_router)  # Temporarily disabled for deployment
@@ -148,7 +151,7 @@ async def root():
             </div>
             
             <div class="feature">
-                <h3>🤖 AI-Powered Scheduling</h3>
+                <h3><img src="/static/images/german-shepherd.png" alt="ChatCal Assistant" style="width: 24px; height: 24px; vertical-align: middle; border-radius: 50%; margin-right: 8px;">AI-Powered Scheduling</h3>
                 <p>Our intelligent assistant helps you find the perfect time that works for both you and Peter</p>
             </div>
             

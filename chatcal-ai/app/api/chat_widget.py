@@ -346,7 +346,27 @@ async def chat_widget(request: Request):
                 
                 const avatar = document.createElement('div');
                 avatar.className = 'message-avatar';
-                avatar.textContent = isUser ? '👤' : '🤖';
+                
+                if (isUser) {{
+                    avatar.textContent = '👤';
+                }} else {{
+                    // Use german-shepherd image for assistant
+                    const img = document.createElement('img');
+                    img.src = '/static/images/german-shepherd.png';
+                    img.alt = 'ChatCal Assistant';
+                    img.style.width = '100%';
+                    img.style.height = '100%';
+                    img.style.borderRadius = '50%';
+                    img.style.objectFit = 'cover';
+                    
+                    // Fallback to emoji if image fails to load
+                    img.onerror = function() {{
+                        avatar.removeChild(img);
+                        avatar.textContent = '🤖';
+                    }};
+                    
+                    avatar.appendChild(img);
+                }}
                 
                 const messageContent = document.createElement('div');
                 messageContent.className = 'message-content';
