@@ -675,6 +675,7 @@ class ChatCalAgent:
         date_patterns = [
             (r"tomorrow", "tomorrow"),
             (r"today", "today"),
+            (r"tonight", "today"),  # "tonight" means today's date
             (r"monday|tuesday|wednesday|thursday|friday|saturday|sunday", None),
             (r"next\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)", None),
             (r"this\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)", None),
