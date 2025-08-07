@@ -1,0 +1,50 @@
+# Virtual environments
+unmute_env/
+venv/
+env/
+ENV/
+
+# Embedded git repositories
+delayed-streams-modeling/
+
+# Model files and cache
+models/
+*.safetensors
+*.bin
+*.pt
+*.pth
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Audio test files
+audio/
+*.wav
+*.mp3
+*.opus
+
+# Docker build files
+Dockerfile.backup
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+.tmp/

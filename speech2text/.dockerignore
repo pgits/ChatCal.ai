@@ -1,0 +1,79 @@
+# Git and development files
+.git
+.gitignore
+.github
+README.md
+*.md
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+unmute_env/
+venv/
+env/
+ENV/
+
+# Model cache (will be downloaded at runtime)
+.cache/
+*.safetensors
+*.bin
+*.pt
+*.pth
+models/
+
+# Audio test files
+audio/
+*.wav
+*.mp3
+*.opus
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+.tmp/
+
+# Test files
+test_*.py
+*_test.py
+debug_*.py
+quick_*.py

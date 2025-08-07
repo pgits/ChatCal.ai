@@ -1,0 +1,96 @@
+# Multi-stage build for Google CloudRun deployment
+# Stage 1: Base image with dependencies
+FROM python:3.12-slim as base
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    curl \
+    git \
+    wget \
+    ffmpeg \
+    libsndfile1 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install uv for fast Python package management
+RUN pip install uv
+
+# Stage 2: Development/CPU-only deployment
+FROM base as cpu
+
+WORKDIR /app
+
+# Copy requirements first for better caching
+COPY requirements.txt ./
+RUN uv pip install --system -r requirements.txt
+
+# Install additional dependencies for unmute-style deployment
+RUN uv pip install --system \
+    fastapi[standard] \
+    uvicorn \
+    websockets \
+    moshi>=0.2.6 \
+    torch \
+    torchaudio \
+    sentencepiece \
+    sounddevice \
+    numpy \
+    redis
+
+# Copy application code
+COPY . .
+
+# Set environment variables for CloudRun
+ENV PORT=8080
+ENV HOST=0.0.0.0
+ENV PYTHONPATH=/app
+ENV HF_HOME=/tmp/huggingface
+ENV TRANSFORMERS_CACHE=/tmp/huggingface
+
+# Create a simple health check endpoint
+EXPOSE 8080
+
+# Default command for CPU-only deployment
+CMD ["python", "cloudrun_server.py"]
+
+# Stage 3: GPU-enabled deployment (for future use)
+FROM nvidia/cuda:12.1-runtime-ubuntu22.04 as gpu
+
+RUN apt-get update && apt-get install -y \
+    python3.12 \
+    python3.12-dev \
+    python3-pip \
+    build-essential \
+    curl \
+    git \
+    wget \
+    ffmpeg \
+    libsndfile1 \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip3 install uv
+
+WORKDIR /app
+
+# Copy requirements and install GPU-optimized versions
+COPY requirements.txt ./
+RUN uv pip install --system -r requirements.txt
+RUN uv pip install --system \
+    torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121 \
+    moshi>=0.2.6 \
+    fastapi[standard] \
+    uvicorn \
+    websockets
+
+COPY . .
+
+ENV PORT=8080
+ENV HOST=0.0.0.0
+ENV PYTHONPATH=/app
+ENV HF_HOME=/tmp/huggingface
+ENV TRANSFORMERS_CACHE=/tmp/huggingface
+ENV CUDA_VISIBLE_DEVICES=0
+
+EXPOSE 8080
+
+CMD ["python", "cloudrun_server_gpu.py"]
