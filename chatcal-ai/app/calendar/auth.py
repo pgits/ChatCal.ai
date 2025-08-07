@@ -239,6 +239,22 @@ class CalendarAuth:
         if not credentials:
             raise ValueError("No valid credentials available. Please authenticate first.")
         
+        # Check if credentials need refresh
+        if not credentials.valid and credentials.refresh_token:
+            try:
+                print("🔄 Refreshing expired credentials for calendar service...")
+                request = Request()
+                credentials.refresh(request)
+                print("✅ Successfully refreshed OAuth credentials for calendar service")
+                
+                # Save the refreshed credentials
+                self.save_credentials(credentials)
+                # Reset service to use new credentials
+                self._service = None
+            except Exception as e:
+                print(f"❌ Failed to refresh credentials in calendar service: {e}")
+                raise ValueError("Credentials expired and refresh failed. Please re-authenticate.")
+        
         if not self._service:
             self._service = build('calendar', 'v3', credentials=credentials)
         
@@ -269,9 +285,28 @@ class CalendarAuth:
         self._service = None
     
     def is_authenticated(self) -> bool:
-        """Check if valid credentials exist."""
+        """Check if valid credentials exist, refreshing if necessary."""
         try:
             credentials = self.load_credentials()
-            return credentials is not None and credentials.valid
-        except:
+            if not credentials:
+                return False
+            
+            # If credentials are expired but we have a refresh token, try to refresh
+            if not credentials.valid and credentials.refresh_token:
+                try:
+                    print("🔄 Access token expired, attempting refresh...")
+                    request = Request()
+                    credentials.refresh(request)
+                    print("✅ Successfully refreshed OAuth credentials")
+                    
+                    # Save the refreshed credentials
+                    self.save_credentials(credentials)
+                    return True
+                except Exception as e:
+                    print(f"❌ Failed to refresh credentials: {e}")
+                    return False
+            
+            return credentials.valid
+        except Exception as e:
+            print(f"❌ Error checking authentication: {e}")
             return False
