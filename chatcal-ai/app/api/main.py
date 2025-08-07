@@ -303,6 +303,7 @@ async def get_conversation_history(session_id: str):
 @app.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
     """Chat with the AI assistant."""
+    print(f"🚨 PRODUCTION DEBUG: Chat endpoint called with message: '{request.message}' session: {request.session_id}")
     try:
         # Create session if not provided
         if not request.session_id:
@@ -314,7 +315,9 @@ async def chat(request: ChatRequest):
             raise HTTPException(status_code=404, detail="Session not found")
         
         # Get response from agent
+        print(f"🚨 PRODUCTION DEBUG: About to call conversation.get_response()")
         response = conversation.get_response(request.message)
+        print(f"🚨 PRODUCTION DEBUG: Agent response received: '{response[:100]}...'")
         
         # Store conversation history
         session_manager.store_conversation_history(request.session_id)
