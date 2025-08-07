@@ -24,20 +24,21 @@ class CalendarAuth:
     def __init__(self):
         self.client_id = settings.google_client_id
         self.client_secret = settings.google_client_secret
-        self.redirect_uri = "http://localhost:8000/auth/callback"
+        # Always use production URL for OAuth since we're deploying to Cloud Run
+        # For local development, you'll need to temporarily change this to localhost
+        self.redirect_uri = "https://chatcal-ai-imoco2uwrq-ue.a.run.app/auth/callback"
         self.credentials_path = settings.google_credentials_path
         self._service = None
     
     def create_auth_flow(self, state: Optional[str] = None) -> Flow:
         """Create OAuth2 flow for authentication."""
+        # Simplified client config - only include essential fields
         client_config = {
             "web": {
                 "client_id": self.client_id,
                 "client_secret": self.client_secret,
                 "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-                "token_uri": "https://oauth2.googleapis.com/token",
-                "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-                "redirect_uris": [self.redirect_uri]
+                "token_uri": "https://oauth2.googleapis.com/token"
             }
         }
         
@@ -64,13 +65,74 @@ class CalendarAuth:
     
     def handle_callback(self, authorization_response: str, state: str) -> Credentials:
         """Handle OAuth2 callback and exchange code for credentials."""
-        flow = self.create_auth_flow(state)
-        flow.fetch_token(authorization_response=authorization_response)
+        import requests
+        from urllib.parse import urlparse, parse_qs
+        from datetime import datetime, timedelta
         
-        credentials = flow.credentials
-        self.save_credentials(credentials)
-        
-        return credentials
+        try:
+            # Parse the authorization code from the response URL
+            parsed_url = urlparse(authorization_response)
+            query_params = parse_qs(parsed_url.query)
+            auth_code = query_params.get('code', [None])[0]
+            
+            if not auth_code:
+                raise Exception("No authorization code found in response")
+            
+            # Custom token exchange using direct HTTP request
+            token_data = {
+                'client_id': self.client_id,
+                'client_secret': self.client_secret,
+                'grant_type': 'authorization_code',
+                'code': auth_code,
+                'redirect_uri': self.redirect_uri
+            }
+            
+            import logging
+            logging.info(f"Token exchange parameters: client_id={self.client_id[:20]}..., code={auth_code[:20]}..., redirect_uri={self.redirect_uri}")
+            logging.info(f"Client secret length: {len(self.client_secret)}")
+            
+            response = requests.post(
+                'https://oauth2.googleapis.com/token',
+                data=token_data,
+                headers={'Content-Type': 'application/x-www-form-urlencoded'}
+            )
+            
+            if response.status_code != 200:
+                import logging
+                logging.error(f"Token exchange HTTP status: {response.status_code}")
+                logging.error(f"Token exchange response: {response.text}")
+                raise Exception(f"Token exchange failed with status {response.status_code}: {response.text}")
+            
+            token_info = response.json()
+            
+            import logging
+            logging.info(f"Token exchange successful! Received: {list(token_info.keys())}")
+            
+            # Create credentials object manually
+            credentials = Credentials(
+                token=token_info['access_token'],
+                refresh_token=token_info.get('refresh_token'),
+                token_uri='https://oauth2.googleapis.com/token',
+                client_id=self.client_id,
+                client_secret=self.client_secret,
+                scopes=self.SCOPES
+            )
+            
+            # Set expiry if provided
+            if 'expires_in' in token_info:
+                expires_in = int(token_info['expires_in'])
+                credentials.expiry = datetime.utcnow() + timedelta(seconds=expires_in)
+            
+            self.save_credentials(credentials)
+            return credentials
+            
+        except Exception as e:
+            import logging
+            logging.error(f"Custom OAuth token exchange failed: {str(e)}")
+            logging.error(f"Authorization response: {authorization_response}")
+            logging.error(f"Client ID: {self.client_id}")
+            logging.error(f"Redirect URI: {self.redirect_uri}")
+            raise
     
     def save_credentials(self, credentials: Credentials):
         """Save credentials to file for future use."""

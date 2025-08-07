@@ -92,7 +92,7 @@ class CalendarTools:
         user_name: str = None,
         user_phone: str = None,
         user_email: str = None,
-        create_meet_conference: bool = False
+        create_meet_conference: bool = True
     ) -> str:
         """
         Create a new calendar appointment with email invitations.

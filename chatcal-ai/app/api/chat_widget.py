@@ -9,7 +9,8 @@ router = APIRouter()
 @router.get("/chat-widget", response_class=HTMLResponse)
 async def chat_widget(request: Request):
     """Embeddable chat widget."""
-    base_url = f"{request.url.scheme}://{request.url.netloc}"
+    # Force HTTPS for Cloud Run deployment to prevent mixed content issues
+    base_url = f"https://{request.url.netloc}"
     
     return f"""
     <!DOCTYPE html>

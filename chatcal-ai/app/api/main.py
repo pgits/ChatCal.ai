@@ -177,12 +177,20 @@ async def health_check():
     """Health check endpoint."""
     services = {}
     
-    # Check Redis connection
+    # Check session storage (Redis or in-memory fallback)
     try:
-        session_manager.redis_client.ping()
-        services["database"] = "healthy"
+        # Test session creation to verify session storage is working
+        test_session = session_manager.create_session({"test": True})
+        if test_session and session_manager.get_session(test_session):
+            session_manager.delete_session(test_session)
+            if session_manager.redis_available:
+                services["database"] = "healthy"
+            else:
+                services["database"] = "healthy_fallback"  # Working with in-memory
+        else:
+            services["database"] = "unhealthy"
     except Exception as e:
-        logger.error(f"Redis health check failed: {e}")
+        logger.error(f"Session storage health check failed: {e}")
         services["database"] = "unhealthy"
     
     # Check Groq LLM (via anthropic_llm interface)
@@ -397,8 +405,8 @@ async def google_auth_login(request: Request, state: Optional[str] = None):
 async def google_auth_callback(request: Request, code: str, state: str):
     """Handle Google OAuth callback."""
     try:
-        # Reconstruct the authorization response URL
-        authorization_response = str(request.url)
+        # Reconstruct the authorization response URL with HTTPS
+        authorization_response = str(request.url).replace("http://", "https://", 1)
         
         # Exchange code for credentials
         credentials = calendar_auth.handle_callback(authorization_response, state)
@@ -429,6 +437,7 @@ async def auth_status():
             "error": str(e),
             "message": "Authentication check failed"
         }
+
 
 
 @app.exception_handler(HTTPException)
