@@ -827,7 +827,7 @@ class CalendarTools:
         else:
             # Smart default: if user provided phone number but didn't request video, default to phone call
             # Otherwise default to Google Meet
-            if user_phone:
+            if user_info.get('phone'):
                 create_meet = False  # Phone call since they gave a phone number
             else:
                 create_meet = True   # Google Meet as general default
