@@ -181,23 +181,14 @@ class ChatCalAgent:
             tool_result = self._check_and_call_tools(message)
             print(f"🔍 Tool result received: {bool(tool_result)} (length: {len(tool_result) if tool_result else 0})")
             
-            # If tool returned a result and it contains HTML formatting or booking indicators,
-            # return it directly without passing through LLM (to preserve HTML formatting)
+            # If tool returned a result, ALWAYS return it directly - do not pass to LLM
+            # The LLM should never override or rewrite tool results
             if tool_result:
-                # Check if it's a formatted tool result (contains HTML or booking confirmations)
-                if any(indicator in tool_result for indicator in [
-                    "<div style=", "🎥 Google Meet:", "📧", "Meeting ID:", 
-                    "Oops!", "confirmed", "Booked!", "All set!", "Perfect!"
-                ]):
-                    print(f"🎯 Returning tool result directly (contains formatting/confirmation)")
-                    return tool_result
-                else:
-                    print(f"🔄 Tool result doesn't contain formatting, passing to LLM: {tool_result[:100]}...")
+                print(f"🎯 ALWAYS returning tool result directly: {tool_result[:100]}...")
+                return tool_result
             
-            # Create enhanced message with tool results if any
+            # Create enhanced message (no tool results since they're returned directly above)
             enhanced_message = message
-            if tool_result:
-                enhanced_message = f"[Tool Result: {tool_result}]\n\nUser: {message}"
             
             # Add user message to memory
             user_message = ChatMessage(role=MessageRole.USER, content=enhanced_message)
