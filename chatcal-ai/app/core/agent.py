@@ -282,7 +282,7 @@ class ChatCalAgent:
                             break
                     
                     if availability_tool:
-                        result = availability_tool.call(date=date_found)
+                        result = availability_tool.call(date_string=date_found)
                         return f"Availability check result: {result}"
                 except Exception as e:
                     return f"Could not check availability: {str(e)}"
