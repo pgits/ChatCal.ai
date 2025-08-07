@@ -20,16 +20,8 @@ class DateTimeParser:
         """Parse various datetime formats from natural language."""
         text = text.lower().strip()
         
-        # Try standard parsing first
-        try:
-            dt = parser.parse(text, fuzzy=True)
-            if dt.tzinfo is None:
-                dt = self.default_timezone.localize(dt)
-            return dt
-        except:
-            pass
-        
-        # Handle relative dates
+        # Handle relative dates first (e.g., "tomorrow at 3pm", "today at 2pm")
+        # This must come before dateutil parsing because dateutil ignores "tomorrow"
         relative_date = self._parse_relative_date(text)
         if relative_date:
             return relative_date
@@ -38,6 +30,15 @@ class DateTimeParser:
         day_date = self._parse_day_name(text)
         if day_date:
             return day_date
+        
+        # Try standard parsing as fallback
+        try:
+            dt = parser.parse(text, fuzzy=True)
+            if dt.tzinfo is None:
+                dt = self.default_timezone.localize(dt)
+            return dt
+        except:
+            pass
         
         return None
     
