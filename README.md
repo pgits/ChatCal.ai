@@ -1,10 +1,17 @@
 # ChatCal.ai
 
-An AI-powered Google Calendar booking assistant with multiple LLM integrations and local model support.
+An AI-powered Google Calendar booking assistant with multiple LLM integrations, local model support, and **persistent OAuth authentication** powered by Google Cloud Secret Manager.
 
 ## Overview
 
 ChatCal.ai is a comprehensive calendar booking solution that combines the power of large language models with Google Calendar integration. The project includes both cloud-based LLM options (Anthropic Claude, Google Gemini) and local model support through Hugging Face transformers.
+
+### 🚀 Latest: Secret Manager OAuth Persistence (v0.3.4)
+**Problem Solved**: OAuth tokens previously expired after 15 minutes when Cloud Run containers restarted, forcing users to re-authenticate frequently.
+
+**Solution**: Integrated Google Cloud Secret Manager for persistent OAuth token storage across container restarts. Now users maintain authenticated sessions even after container lifecycle events.
+
+**Technical Achievement**: Multi-tier storage system with Secret Manager (persistent) → In-memory cache (fast) → Redis/File fallbacks.
 
 ## Project Structure
 
@@ -94,8 +101,9 @@ python3 hf-lama.py
 - ✅ Anthropic Claude (Sonnet, Haiku)
 - ✅ Google Gemini Pro
 - ✅ Google Calendar API
-- ✅ OAuth2 authentication
+- ✅ OAuth2 authentication with **Secret Manager persistence**
 - ✅ Session management
+- 🚀 **NEW**: Persistent OAuth across container restarts (v0.3.4)
 
 ### Local Capabilities
 - ✅ Local model inference
@@ -106,9 +114,11 @@ python3 hf-lama.py
 
 ### Deployment
 - ✅ Docker containerization
-- ✅ Docker Compose orchestration
+- ✅ Docker Compose orchestration  
 - ✅ Development & production configs
 - ✅ Health checks & monitoring
+- 🔐 **Google Cloud Secret Manager integration**
+- ⏱️ **Persistent OAuth tokens across container restarts**
 
 ## Documentation
 
