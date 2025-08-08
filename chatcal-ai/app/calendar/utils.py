@@ -46,26 +46,42 @@ class DateTimeParser:
         """Parse relative dates like 'tomorrow', 'next week', etc."""
         base_time = self.now.replace(hour=9, minute=0, second=0, microsecond=0)
         
-        # Extract time component if present (e.g., "at 3pm", "at 10:30am")
-        time_match = re.search(r'at\s+(\d{1,2}):?(\d{2})?\s*(am|pm)|at\s+(\d{1,2})\s*(am|pm)', text.lower())
-        if time_match:
-            if time_match.group(1):  # Format: "at 3:30pm" or "at 15:30"
-                hour = int(time_match.group(1))
-                minute = int(time_match.group(2)) if time_match.group(2) else 0
-                period = time_match.group(3)
-            else:  # Format: "at 3pm"
-                hour = int(time_match.group(4))
-                minute = 0
-                period = time_match.group(5)
-            
-            # Convert to 24-hour format
-            if period:
-                if period.lower() == 'pm' and hour != 12:
-                    hour += 12
-                elif period.lower() == 'am' and hour == 12:
-                    hour = 0
-            
-            base_time = base_time.replace(hour=hour, minute=minute)
+        # Extract time component if present (e.g., "at 3pm", "at 10:30am", "at noon")
+        # Handle word-based times first
+        word_time_match = re.search(r'at\s+(noon|midnight|morning|afternoon|evening)', text.lower())
+        if word_time_match:
+            time_word = word_time_match.group(1)
+            if time_word == 'noon':
+                base_time = base_time.replace(hour=12, minute=0)
+            elif time_word == 'midnight':
+                base_time = base_time.replace(hour=0, minute=0)
+            elif time_word == 'morning':
+                base_time = base_time.replace(hour=9, minute=0)
+            elif time_word == 'afternoon':
+                base_time = base_time.replace(hour=14, minute=0)
+            elif time_word == 'evening':
+                base_time = base_time.replace(hour=18, minute=0)
+        else:
+            # Handle numeric times
+            time_match = re.search(r'at\s+(\d{1,2}):?(\d{2})?\s*(am|pm)|at\s+(\d{1,2})\s*(am|pm)', text.lower())
+            if time_match:
+                if time_match.group(1):  # Format: "at 3:30pm" or "at 15:30"
+                    hour = int(time_match.group(1))
+                    minute = int(time_match.group(2)) if time_match.group(2) else 0
+                    period = time_match.group(3)
+                else:  # Format: "at 3pm"
+                    hour = int(time_match.group(4))
+                    minute = 0
+                    period = time_match.group(5)
+                
+                # Convert to 24-hour format
+                if period:
+                    if period.lower() == 'pm' and hour != 12:
+                        hour += 12
+                    elif period.lower() == 'am' and hour == 12:
+                        hour = 0
+                
+                base_time = base_time.replace(hour=hour, minute=minute)
         
         # Today/tonight
         if any(word in text for word in ['today', 'tonight']):
@@ -131,6 +147,18 @@ class DateTimeParser:
     def parse_time(self, text: str) -> Optional[Tuple[int, int]]:
         """Parse time from text, returning (hour, minute) tuple."""
         text = text.lower().strip()
+        
+        # Handle common time words first
+        if 'noon' in text:
+            return (12, 0)
+        elif 'midnight' in text:
+            return (0, 0)
+        elif 'morning' in text:
+            return (9, 0)  # Default morning time
+        elif 'afternoon' in text:
+            return (14, 0)  # 2 PM
+        elif 'evening' in text:
+            return (18, 0)  # 6 PM
         
         # Handle AM/PM format
         am_pm_match = re.search(r'(\d{1,2})(?::(\d{2}))?\s*(am|pm)', text)
