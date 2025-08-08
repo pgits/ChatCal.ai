@@ -11,10 +11,11 @@ from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from app.config import settings
+from app.core.secrets import secret_manager_service
 
 
 class CalendarAuth:
-    """Handles Google Calendar OAuth2 authentication."""
+    """Handles Google Calendar OAuth2 authentication with Secret Manager storage."""
     
     # OAuth2 scopes required for calendar access
     SCOPES = [
@@ -25,13 +26,29 @@ class CalendarAuth:
     def __init__(self):
         self.client_id = settings.google_client_id
         self.client_secret = settings.google_client_secret
+        
+        # Force correct client ID if settings returns None or wrong value
+        if not self.client_id or self.client_id != "432729289953-1di05ajntobgvv0aakgjahnrtp60491j.apps.googleusercontent.com":
+            self.client_id = "432729289953-1di05ajntobgvv0aakgjahnrtp60491j.apps.googleusercontent.com"
+            print(f"🔧 Forced correct client ID: {self.client_id}")
+        
+        # Debug logging for OAuth configuration
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"🔐 OAuth Configuration: client_id={self.client_id[:20]}... (length: {len(self.client_id) if self.client_id else 0})")
+        logger.info(f"🔐 Client secret configured: {bool(self.client_secret)}")
+        
         # Always use production URL for OAuth since we're deploying to Cloud Run
         # For local development, you'll need to temporarily change this to localhost
         self.redirect_uri = "https://chatcal-ai-imoco2uwrq-ue.a.run.app/auth/callback"
         self.credentials_path = settings.google_credentials_path
         self._service = None
         
-        # Redis client for persistent credential storage
+        # In-memory credential cache (persists for container lifetime)
+        self._cached_credentials = None
+        self._credentials_loaded_at = None
+        
+        # Redis client for session data (keeping for non-auth data)
         try:
             self.redis_client = redis.from_url(settings.redis_url)
             self.use_redis = True
@@ -144,7 +161,7 @@ class CalendarAuth:
             raise
     
     def save_credentials(self, credentials: Credentials):
-        """Save credentials to Redis (persistent) or file (fallback)."""
+        """Save credentials to Secret Manager (refresh token) and memory (access token)."""
         creds_data = {
             'token': credentials.token,
             'refresh_token': credentials.refresh_token,
@@ -155,81 +172,148 @@ class CalendarAuth:
             'expiry': credentials.expiry.isoformat() if credentials.expiry else None
         }
         
-        # Primary storage: Redis (persistent across container restarts)
+        # Primary storage: Secret Manager (for refresh token persistence)
+        if secret_manager_service.available and credentials.refresh_token:
+            try:
+                secret_manager_service.store_oauth_credentials(creds_data)
+                print("✅ OAuth refresh token saved to Secret Manager")
+            except Exception as e:
+                print(f"⚠️ Failed to save to Secret Manager (will try fallback): {e}")
+        
+        # In-memory cache: Store full credentials for container lifetime
+        self._cached_credentials = credentials
+        self._credentials_loaded_at = datetime.utcnow()
+        print("✅ Credentials cached in memory for container lifetime")
+        
+        # Fallback storage: Redis (if available)
         if self.use_redis and self.redis_client:
             try:
-                # Store with 30-day expiration for security (but refresh token should keep it alive)
                 self.redis_client.setex(
                     'google_calendar_credentials',
                     30 * 24 * 60 * 60,  # 30 days in seconds
                     json.dumps(creds_data)
                 )
-                print("✅ Credentials saved to Redis (persistent storage)")
-                return
+                print("✅ Credentials also saved to Redis (fallback)")
             except Exception as e:
-                print(f"❌ Failed to save to Redis: {e}")
+                print(f"⚠️ Redis fallback failed: {e}")
         
-        # Fallback storage: Local file (temporary)
+        # Final fallback: Local file (temporary)
         try:
             os.makedirs(os.path.dirname(self.credentials_path), exist_ok=True)
             with open(self.credentials_path, 'w') as f:
                 json.dump(creds_data, f)
-            print("✅ Credentials saved to local file (temporary)")
+            print("✅ Credentials also saved to local file (final fallback)")
         except Exception as e:
-            print(f"❌ Failed to save credentials: {e}")
+            print(f"⚠️ Local file fallback failed: {e}")
     
     def load_credentials(self) -> Optional[Credentials]:
-        """Load saved credentials from Redis (persistent) or file (fallback)."""
-        creds_data = None
+        """Load credentials with optimized caching: Memory -> Secret Manager -> Fallbacks."""
         
-        # Primary storage: Try Redis first (persistent)
+        # 1. Try in-memory cache first (fastest, persists for container lifetime)
+        if (self._cached_credentials and 
+            self._credentials_loaded_at and 
+            (datetime.utcnow() - self._credentials_loaded_at).total_seconds() < 3600):  # 1 hour cache
+            
+            # Check if cached credentials are still valid or can be refreshed
+            if self._cached_credentials.valid:
+                print("✅ Using cached credentials (in-memory)")
+                return self._cached_credentials
+            elif self._cached_credentials.refresh_token:
+                try:
+                    print("🔄 Refreshing cached credentials...")
+                    self._cached_credentials.refresh(Request())
+                    print("✅ Cached credentials refreshed successfully")
+                    return self._cached_credentials
+                except Exception as e:
+                    print(f"⚠️ Failed to refresh cached credentials: {e}")
+                    # Continue to Secret Manager lookup
+        
+        # 2. Try Secret Manager (persistent across container restarts)
+        creds_data = None
+        if secret_manager_service.available:
+            try:
+                secret_data = secret_manager_service.load_oauth_credentials()
+                if secret_data:
+                    # Reconstruct full credentials from stored refresh token data
+                    credentials = Credentials(
+                        token=None,  # Will be refreshed
+                        refresh_token=secret_data.get('refresh_token'),
+                        token_uri=secret_data.get('token_uri', 'https://oauth2.googleapis.com/token'),
+                        client_id=secret_data.get('client_id', self.client_id),
+                        client_secret=secret_data.get('client_secret', self.client_secret),
+                        scopes=secret_data.get('scopes', self.SCOPES)
+                    )
+                    
+                    # Always refresh when loading from Secret Manager (access tokens expire)
+                    if credentials.refresh_token:
+                        try:
+                            print("🔄 Refreshing credentials from Secret Manager...")
+                            credentials.refresh(Request())
+                            
+                            # Cache the refreshed credentials
+                            self._cached_credentials = credentials
+                            self._credentials_loaded_at = datetime.utcnow()
+                            
+                            print("✅ Credentials loaded and refreshed from Secret Manager")
+                            return credentials
+                        except Exception as e:
+                            print(f"❌ Failed to refresh Secret Manager credentials: {e}")
+            except Exception as e:
+                print(f"⚠️ Failed to load from Secret Manager: {e}")
+        
+        # 3. Fallback to Redis (if available)
         if self.use_redis and self.redis_client:
             try:
                 redis_data = self.redis_client.get('google_calendar_credentials')
                 if redis_data:
                     creds_data = json.loads(redis_data.decode('utf-8'))
-                    print("✅ Credentials loaded from Redis (persistent storage)")
+                    print("✅ Credentials loaded from Redis (fallback)")
             except Exception as e:
-                print(f"❌ Failed to load from Redis: {e}")
+                print(f"⚠️ Failed to load from Redis: {e}")
         
-        # Fallback storage: Try local file
+        # 4. Final fallback: Local file
         if not creds_data and os.path.exists(self.credentials_path):
             try:
                 with open(self.credentials_path, 'r') as f:
                     creds_data = json.load(f)
-                print("✅ Credentials loaded from local file")
+                print("✅ Credentials loaded from local file (final fallback)")
             except Exception as e:
-                print(f"❌ Failed to load from file: {e}")
+                print(f"⚠️ Failed to load from file: {e}")
         
-        if not creds_data:
-            return None
+        # Process fallback data if found
+        if creds_data:
+            credentials = Credentials(
+                token=creds_data['token'],
+                refresh_token=creds_data.get('refresh_token'),
+                token_uri=creds_data['token_uri'],
+                client_id=creds_data['client_id'],
+                client_secret=creds_data['client_secret'],
+                scopes=creds_data['scopes']
+            )
+            
+            # Set expiry if available
+            if creds_data.get('expiry'):
+                credentials.expiry = datetime.fromisoformat(creds_data['expiry'])
+            
+            # Refresh if expired and we have refresh token
+            if credentials.expired and credentials.refresh_token:
+                try:
+                    print("🔄 Refreshing expired fallback credentials...")
+                    credentials.refresh(Request())
+                    # Save refreshed credentials to all storage locations
+                    self.save_credentials(credentials)
+                    print("✅ Fallback credentials refreshed and saved")
+                except Exception as e:
+                    print(f"❌ Failed to refresh fallback credentials: {e}")
+                    return None
+            
+            # Cache the credentials
+            self._cached_credentials = credentials
+            self._credentials_loaded_at = datetime.utcnow()
+            return credentials
         
-        credentials = Credentials(
-            token=creds_data['token'],
-            refresh_token=creds_data.get('refresh_token'),
-            token_uri=creds_data['token_uri'],
-            client_id=creds_data['client_id'],
-            client_secret=creds_data['client_secret'],
-            scopes=creds_data['scopes']
-        )
-        
-        # Set expiry if available
-        if creds_data.get('expiry'):
-            credentials.expiry = datetime.fromisoformat(creds_data['expiry'])
-        
-        # Refresh if expired and we have refresh token
-        if credentials.expired and credentials.refresh_token:
-            try:
-                print("🔄 Refreshing expired credentials...")
-                credentials.refresh(Request())
-                # Save refreshed credentials back to storage
-                self.save_credentials(credentials)
-                print("✅ Credentials refreshed and saved")
-            except Exception as e:
-                print(f"❌ Failed to refresh credentials: {e}")
-                return None
-        
-        return credentials
+        print("❌ No OAuth credentials found in any storage location")
+        return None
     
     def get_calendar_service(self, credentials: Optional[Credentials] = None):
         """Get authenticated Google Calendar service."""
@@ -269,13 +353,25 @@ class CalendarAuth:
             except:
                 pass  # Ignore revocation errors
         
+        # Clear in-memory cache
+        self._cached_credentials = None
+        self._credentials_loaded_at = None
+        print("✅ Credentials cleared from memory cache")
+        
+        # Remove from Secret Manager
+        if secret_manager_service.available:
+            try:
+                secret_manager_service.delete_oauth_credentials()
+            except Exception as e:
+                print(f"⚠️ Failed to remove from Secret Manager: {e}")
+        
         # Remove from Redis
         if self.use_redis and self.redis_client:
             try:
                 self.redis_client.delete('google_calendar_credentials')
                 print("✅ Credentials removed from Redis")
             except Exception as e:
-                print(f"❌ Failed to remove from Redis: {e}")
+                print(f"⚠️ Failed to remove from Redis: {e}")
         
         # Remove credentials file
         if os.path.exists(self.credentials_path):

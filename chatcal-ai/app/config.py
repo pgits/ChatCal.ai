@@ -75,3 +75,11 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+# Debug logging for critical settings
+import logging
+logger = logging.getLogger(__name__)
+logger.info(f"🔧 Settings Debug - Google Client ID: {settings.google_client_id[:20] if settings.google_client_id else 'NOT_SET'}...")
+logger.info(f"🔧 Settings Debug - Google Client Secret: {'SET' if settings.google_client_secret else 'NOT_SET'}")
+logger.info(f"🔧 Settings Debug - App Env: {settings.app_env}")
+logger.info(f"🔧 Settings Debug - Calendar ID: {settings.google_calendar_id}")

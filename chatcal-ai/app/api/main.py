@@ -28,12 +28,14 @@ from app.core.exceptions import (
     LLMError, ValidationError, RateLimitError
 )
 from app.core.llm_gemini import gemini_llm
+# Import Secret Manager to ensure it's initialized on startup
+from app.core.secrets import secret_manager_service
 
 # Create FastAPI app
 app = FastAPI(
     title="ChatCal.ai",
     description="AI-powered calendar assistant for booking appointments",
-    version="0.2.0",
+    version="0.3.4",
     docs_url="/docs",
     redoc_url="/redoc"
 )
@@ -56,6 +58,9 @@ if settings.testing_mode:
     logger.info("🧪 TESTING MODE ENABLED - Peter's email will be treated as regular user email")
 else:
     logger.info("📧 Production mode - Peter's email will receive special formatting")
+
+# Log Secret Manager status on startup
+logger.info(f"🔐 Secret Manager Service Status: Available={secret_manager_service.available}, Project={secret_manager_service.project_id}")
 
 # Calendar auth instance
 calendar_auth = CalendarAuth()
@@ -153,7 +158,7 @@ async def root():
             </div>
             
             <div class="feature">
-                <h3><img src="/static/images/german-shepherd.png" alt="ChatCal Assistant" style="width: 24px; height: 24px; vertical-align: middle; border-radius: 50%; margin-right: 8px;">AI-Powered Scheduling</h3>
+                <h3><img src="/static/images/Calendar-icon.png" alt="ChatCal Assistant" style="width: 24px; height: 24px; vertical-align: middle; border-radius: 50%; margin-right: 8px;">AI-Powered Scheduling</h3>
                 <p>Our intelligent assistant helps you find the perfect time that works for both you and Peter</p>
             </div>
             
@@ -171,7 +176,7 @@ async def root():
             </div>
             
             <div style="text-align: center; margin-top: 30px; color: #888;">
-                <p>Version 0.2.0 | Built with FastAPI & LlamaIndex</p>
+                <p>Version 0.3.4 | Built with FastAPI & LlamaIndex</p>
             </div>
         </div>
     </body>
@@ -228,7 +233,7 @@ async def health_check():
     
     return HealthResponse(
         status=overall_status,
-        version="0.2.0",
+        version="0.3.4",
         timestamp=datetime.utcnow(),
         services=services
     )
@@ -272,7 +277,7 @@ async def get_version():
             healthy = False
         
         return VersionResponse(
-            app_version="0.2.0",
+            app_version="0.3.4",
             git_commit=git_commit,
             git_branch=git_branch,
             build_timestamp=datetime.utcnow(),
@@ -457,6 +462,11 @@ async def google_auth_login(request: Request, state: Optional[str] = None):
     try:
         auth_url, oauth_state = calendar_auth.get_authorization_url(state)
         
+        # Debug logging for OAuth configuration
+        logger.info(f"🚨 DEBUG: calendar_auth.client_id = {calendar_auth.client_id}")
+        logger.info(f"🚨 DEBUG: settings.google_client_id = {settings.google_client_id}")
+        logger.info(f"🚨 DEBUG: Generated auth_url contains: {auth_url[:100]}...")
+        
         return AuthResponse(
             auth_url=auth_url,
             state=oauth_state
@@ -500,6 +510,43 @@ async def auth_status():
             "authenticated": False,
             "error": str(e),
             "message": "Authentication check failed"
+        }
+
+
+@app.get("/debug/secret-manager")
+async def debug_secret_manager():
+    """Debug endpoint to check Secret Manager status."""
+    try:
+        # Import here to test in runtime
+        from app.core.secrets import secret_manager_service
+        
+        debug_info = {
+            "available": secret_manager_service.available,
+            "project_id": secret_manager_service.project_id,
+            "secret_name": secret_manager_service.secret_name,
+            "client_initialized": secret_manager_service.client is not None
+        }
+        
+        # Test library import
+        try:
+            from google.cloud import secretmanager
+            debug_info["library_import"] = "SUCCESS"
+        except ImportError as e:
+            debug_info["library_import"] = f"FAILED: {str(e)}"
+        
+        # Try to load credentials
+        try:
+            creds = secret_manager_service.load_oauth_credentials()
+            debug_info["load_test"] = "SUCCESS" if creds else "NO_CREDENTIALS_FOUND"
+        except Exception as e:
+            debug_info["load_test"] = f"ERROR: {str(e)}"
+        
+        return debug_info
+        
+    except Exception as e:
+        return {
+            "error": str(e),
+            "message": "Debug failed"
         }
 
 
