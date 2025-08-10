@@ -350,9 +350,9 @@ async def chat_widget(request: Request):
                 if (isUser) {{
                     avatar.textContent = '👤';
                 }} else {{
-                    // Use german-shepherd image for assistant
+                    // Use calendar-icon image for assistant
                     const img = document.createElement('img');
-                    img.src = '/static/images/german-shepherd.png';
+                    img.src = '/static/images/Calendar-icon.png';
                     img.alt = 'ChatCal Assistant';
                     img.style.width = '100%';
                     img.style.height = '100%';

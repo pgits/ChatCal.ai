@@ -7,11 +7,13 @@ Supports both REST API and WebSocket connections
 import asyncio
 import base64
 import json
+import ssl
 import time
 import numpy as np
 import requests
 import websockets
 import sounddevice as sd
+import certifi
 from typing import Optional
 
 class STTClient:
@@ -62,13 +64,75 @@ class STTClient:
             print(f"Transcription failed: {e}")
             return None
     
+    def create_ssl_context(self, strategy: str = "auto"):
+        """Create SSL context with different strategies"""
+        try:
+            if strategy == "secure":
+                # Production-grade SSL with full verification
+                context = ssl.create_default_context()
+                context.check_hostname = True
+                context.verify_mode = ssl.CERT_REQUIRED
+                context.load_verify_locations(certifi.where())
+                return context
+            elif strategy == "relaxed":
+                # Relaxed SSL for CloudRun (no hostname verification)
+                context = ssl.create_default_context()
+                context.check_hostname = False
+                context.verify_mode = ssl.CERT_REQUIRED
+                context.load_verify_locations(certifi.where())
+                return context
+            elif strategy == "unverified":
+                # Unverified SSL (development only)
+                context = ssl.create_default_context()
+                context.check_hostname = False
+                context.verify_mode = ssl.CERT_NONE
+                return context
+            else:
+                # Auto-detect best strategy
+                return None
+        except Exception as e:
+            print(f"Warning: SSL context creation failed: {e}")
+            return None
+
+    async def connect_websocket(self, uri: str):
+        """Connect to WebSocket with SSL fallback strategies"""
+        strategies = [
+            ("secure", "Secure SSL with full verification"),
+            ("relaxed", "Relaxed SSL (CloudRun compatible)"),
+            ("unverified", "Unverified SSL (development only)")
+        ]
+        
+        for strategy_name, description in strategies:
+            try:
+                print(f"🔐 Trying {description}...")
+                ssl_context = self.create_ssl_context(strategy_name)
+                
+                websocket = await websockets.connect(
+                    uri, 
+                    ssl=ssl_context,
+                    ping_interval=20,
+                    ping_timeout=10
+                )
+                
+                print(f"✅ Connected using {description}")
+                return websocket
+                
+            except ssl.SSLError as e:
+                print(f"❌ {strategy_name} SSL failed: {e}")
+            except Exception as e:
+                print(f"❌ {strategy_name} failed: {type(e).__name__}: {e}")
+        
+        raise ConnectionError("All SSL strategies failed")
+
     async def test_websocket(self, duration: float = 5.0):
         """Test real-time transcription via WebSocket"""
         try:
             uri = f"{self.ws_url}/ws/transcribe"
             print(f"Connecting to WebSocket: {uri}")
             
-            async with websockets.connect(uri) as websocket:
+            websocket = await self.connect_websocket(uri)
+            
+            async with websocket:
                 print("WebSocket connected, sending test audio...")
                 
                 # Send test audio chunks
@@ -126,7 +190,9 @@ class STTClient:
             samplerate = 24000
             blocksize = int(0.1 * samplerate)  # 100ms blocks
             
-            async with websockets.connect(uri) as websocket:
+            websocket = await self.connect_websocket(uri)
+            
+            async with websocket:
                 print(f"🎤 Recording from microphone for {duration} seconds...")
                 print("Speak into your microphone!")
                 

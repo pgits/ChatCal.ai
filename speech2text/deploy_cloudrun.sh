@@ -14,11 +14,9 @@ REGION=${2:-"us-east1"}
 # Set image tag based on deployment type
 if [ "$DEPLOYMENT_TYPE" = "gpu" ]; then
     IMAGE_TAG="gcr.io/$PROJECT_ID/$SERVICE_NAME-gpu:latest"
-    DOCKERFILE_TARGET="gpu"
     echo "🚀 Deploying with GPU support..."
 else
     IMAGE_TAG="gcr.io/$PROJECT_ID/$SERVICE_NAME-cpu:latest"
-    DOCKERFILE_TARGET="cpu"
     echo "🚀 Deploying CPU-only version..."
 fi
 
@@ -30,7 +28,6 @@ echo "Image: $IMAGE_TAG"
 echo "📦 Building Docker image..."
 docker build \
     --platform linux/amd64 \
-    --target $DOCKERFILE_TARGET \
     -t $IMAGE_TAG \
     .
 
@@ -59,7 +56,7 @@ if [ "$DEPLOYMENT_TYPE" = "gpu" ]; then
         --set-env-vars "DEPLOYMENT_TYPE=gpu" \
         --set-env-vars "CUDA_VISIBLE_DEVICES=0"
 else
-    # Deploy CPU-only
+    # Deploy CPU-only with WebSocket-optimized settings
     gcloud run deploy $SERVICE_NAME-cpu \
         --image $IMAGE_TAG \
         --platform managed \
@@ -68,11 +65,12 @@ else
         --port 8080 \
         --memory 4Gi \
         --cpu 2 \
-        --timeout 300 \
+        --timeout 3600 \
         --concurrency 10 \
         --max-instances 10 \
         --min-instances 0 \
-        --set-env-vars "DEPLOYMENT_TYPE=cpu"
+        --set-env-vars "DEPLOYMENT_TYPE=cpu" \
+        --session-affinity
 fi
 
 echo "✅ Deployment complete!"
