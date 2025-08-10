@@ -41,7 +41,7 @@ class CalendarAuth:
         
         # Always use production URL for OAuth since we're deploying to Cloud Run
         # For local development, you'll need to temporarily change this to localhost
-        self.redirect_uri = "https://chatcal-ai-imoco2uwrq-ue.a.run.app/auth/callback"
+        self.redirect_uri = "https://chatcal-ai-432729289953.us-east1.run.app/auth/callback"
         self.credentials_path = settings.google_credentials_path
         self._service = None
         
