@@ -456,6 +456,19 @@ async def stream_chat(request: ChatRequest):
         raise HTTPException(status_code=500, detail=f"Stream chat error: {str(e)}")
 
 
+@app.get("/debug/oauth")
+async def debug_oauth_config():
+    """Debug OAuth configuration."""
+    import os
+    return {
+        "calendar_auth_client_id": calendar_auth.client_id,
+        "calendar_auth_client_secret": bool(calendar_auth.client_secret),
+        "settings_google_client_id": settings.google_client_id,
+        "settings_google_client_secret": bool(settings.google_client_secret),
+        "env_google_client_id": os.getenv("GOOGLE_CLIENT_ID"),
+        "env_google_client_secret": bool(os.getenv("GOOGLE_CLIENT_SECRET"))
+    }
+
 @app.get("/auth/login", response_model=AuthResponse)
 async def google_auth_login(request: Request, state: Optional[str] = None):
     """Initiate Google OAuth login."""
