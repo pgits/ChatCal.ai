@@ -38,10 +38,15 @@ class CalendarAuth:
         logger = logging.getLogger(__name__)
         logger.info(f"🔐 OAuth Configuration: client_id={self.client_id[:20]}... (length: {len(self.client_id) if self.client_id else 0})")
         logger.info(f"🔐 Client secret configured: {bool(self.client_secret)}")
+        logger.info(f"🔐 Redirect URI: {self.redirect_uri}")
         
-        # Always use production URL for OAuth since we're deploying to Cloud Run
-        # For local development, you'll need to temporarily change this to localhost
-        self.redirect_uri = "https://chatcal-ai-432729289953.us-east1.run.app/auth/callback"
+        # Use environment variable for redirect URI or detect from current deployment
+        # For production Cloud Run: use the current service URL
+        # For local development: use localhost
+        self.redirect_uri = os.environ.get(
+            "GOOGLE_OAUTH_REDIRECT_URI", 
+            "https://chatcal-ai-imoco2uwrq-ue.a.run.app/auth/callback"
+        )
         self.credentials_path = settings.google_credentials_path
         self._service = None
         
