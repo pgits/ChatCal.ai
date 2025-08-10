@@ -27,10 +27,11 @@ class CalendarAuth:
         self.client_id = settings.google_client_id
         self.client_secret = settings.google_client_secret
         
-        # Force correct client ID if settings returns None or wrong value
-        if not self.client_id or self.client_id != "432729289953-1di05ajntobgvv0aakgjahnrtp60491j.apps.googleusercontent.com":
-            self.client_id = "432729289953-1di05ajntobgvv0aakgjahnrtp60491j.apps.googleusercontent.com"
-            print(f"🔧 Forced correct client ID: {self.client_id}")
+        # Validate that we have the required OAuth configuration
+        if not self.client_id:
+            raise ValueError("GOOGLE_CLIENT_ID environment variable is required")
+        if not self.client_secret:
+            raise ValueError("GOOGLE_CLIENT_SECRET environment variable is required")
         
         # Debug logging for OAuth configuration
         import logging
