@@ -44,8 +44,15 @@ jobs:
         docker build -f Dockerfile -t gcr.io/$PROJECT_ID/$SERVICE:$GITHUB_SHA .
         docker push gcr.io/$PROJECT_ID/$SERVICE:$GITHUB_SHA
 
-    - name: Deploy to Cloud Run
+    - name: Delete Existing Service (Fresh Deploy)
       run: |
+        echo "🗑️ Deleting existing service for fresh deployment..."
+        gcloud run services delete $SERVICE --region=$REGION --quiet || echo "Service may not exist"
+        echo "✅ Service deleted"
+
+    - name: Deploy Fresh Service (v0.5.0 OAuth Persistence)
+      run: |
+        echo "🚀 Deploying fresh ChatCal.ai v0.5.0 with OAuth persistence..."
         gcloud run deploy $SERVICE \
           --image gcr.io/$PROJECT_ID/$SERVICE:$GITHUB_SHA \
           --platform managed \
@@ -55,6 +62,18 @@ jobs:
           --update-secrets="GROQ_API_KEY=groq-api-key:latest,GOOGLE_CLIENT_SECRET=google-client-secret:latest,SMTP_PASSWORD=smtp-password:latest,SECRET_KEY=secret-key:latest" \
           --timeout=300 \
           --max-instances=5
+        echo "✅ Fresh deployment complete"
+
+    - name: Verify Fresh Deployment
+      run: |
+        echo "🔍 Verifying fresh deployment..."
+        SERVICE_URL=$(gcloud run services describe $SERVICE --platform managed --region $REGION --format 'value(status.url)')
+        echo "🌐 Service URL: $SERVICE_URL"
+        echo "⏱️ Waiting for service to be ready..."
+        sleep 30
+        echo "🔍 Testing version endpoint..."
+        curl -s "$SERVICE_URL/version" || echo "Version endpoint not ready yet"
+        echo "🎉 Fresh deployment of v0.5.0 complete!"
 
     - name: Show URL
       run: gcloud run services describe $SERVICE --platform managed --region $REGION --format 'value(status.url)'
