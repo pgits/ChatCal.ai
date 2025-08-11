@@ -35,7 +35,7 @@ from app.core.secrets import secret_manager_service
 app = FastAPI(
     title="ChatCal.ai",
     description="AI-powered calendar assistant for booking appointments",
-    version="0.3.4",
+    version="0.5.0-FRESH-DEPLOY",
     docs_url="/docs",
     redoc_url="/redoc"
 )
@@ -277,7 +277,7 @@ async def get_version():
             healthy = False
         
         return VersionResponse(
-            app_version="0.5.0-oauth-persistence",
+            app_version="0.5.0-FRESH-DEPLOY-SUCCESS",
             git_commit=git_commit,
             git_branch=git_branch,
             build_timestamp=datetime.utcnow(),
