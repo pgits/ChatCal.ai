@@ -37,7 +37,7 @@ class CalendarAuth:
         # For production Cloud Run: use the current service URL
         # For local development: use localhost
         self.redirect_uri = os.environ.get(
-            "GOOGLE_OAUTH_REDIRECT_URI", 
+            "GOOGLE_OAUTH_REDIRECT_URI",
             "https://chatcal-ai-imoco2uwrq-ue.a.run.app/auth/callback"
         )
         
