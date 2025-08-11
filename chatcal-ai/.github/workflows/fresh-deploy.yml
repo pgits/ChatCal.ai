@@ -1,0 +1,89 @@
+name: Fresh Deploy v0.5.0
+
+on:
+  workflow_dispatch:
+    inputs:
+      force_delete:
+        description: 'Force delete existing service'
+        required: true
+        default: 'true'
+        type: boolean
+
+env:
+  PROJECT_ID: chatcal-ai-prod-monroe919
+  SERVICE: chatcal-ai
+  REGION: us-east1
+
+jobs:
+  fresh-deploy:
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Google Auth (Workload Identity Federation)
+      id: auth
+      uses: 'google-github-actions/auth@v2'
+      with:
+        workload_identity_provider: 'projects/432729289953/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions-provider'
+        service_account: 'github-actions@chatcal-ai-prod-monroe919.iam.gserviceaccount.com'
+
+    - name: Set up Cloud SDK
+      uses: 'google-github-actions/setup-gcloud@v2'
+      with:
+        project_id: '${{ env.PROJECT_ID }}'
+
+    - name: Configure Docker to use gcloud as a credential helper
+      run: |
+        gcloud auth configure-docker
+
+    - name: Delete Existing Service (if requested)
+      if: ${{ github.event.inputs.force_delete == 'true' }}
+      run: |
+        echo "🗑️ Deleting existing Cloud Run service..."
+        gcloud run services delete $SERVICE --region=$REGION --quiet || echo "Service may not exist"
+        echo "✅ Delete completed"
+
+    - name: Build and Push Container (v0.5.0 OAuth Persistence)
+      run: |
+        cd chatcal-ai
+        echo "🔨 Building v0.5.0 with OAuth persistence..."
+        docker build -t gcr.io/$PROJECT_ID/$SERVICE:v0.5.0-oauth-$GITHUB_SHA .
+        echo "📤 Pushing image..."
+        docker push gcr.io/$PROJECT_ID/$SERVICE:v0.5.0-oauth-$GITHUB_SHA
+
+    - name: Deploy Fresh Service
+      run: |
+        echo "🚀 Deploying fresh ChatCal.ai v0.5.0..."
+        gcloud run deploy $SERVICE \
+          --image gcr.io/$PROJECT_ID/$SERVICE:v0.5.0-oauth-$GITHUB_SHA \
+          --platform managed \
+          --region $REGION \
+          --allow-unauthenticated \
+          --set-env-vars="GOOGLE_CLIENT_ID=432729289953-gmo9g4i22onoah53ehiilba6dfgu12qu.apps.googleusercontent.com,MY_EMAIL_ADDRESS=pgits.job@gmail.com,MY_PHONE_NUMBER=6308805488,SMTP_USERNAME=pgits.job@gmail.com,ENVIRONMENT=production,TESTING_MODE=false" \
+          --update-secrets="GROQ_API_KEY=groq-api-key:latest,GOOGLE_CLIENT_SECRET=google-client-secret:latest,SMTP_PASSWORD=smtp-password:latest,SECRET_KEY=secret-key:latest" \
+          --timeout=300 \
+          --max-instances=5
+
+    - name: Verify Deployment
+      run: |
+        echo "🔍 Getting service URL..."
+        SERVICE_URL=$(gcloud run services describe $SERVICE --platform managed --region $REGION --format 'value(status.url)')
+        echo "🌐 Service URL: $SERVICE_URL"
+        
+        echo "⏱️ Waiting for service to be ready..."
+        sleep 30
+        
+        echo "🔍 Testing version endpoint..."
+        curl -s "$SERVICE_URL/version" | jq '.'
+        
+        echo "🔍 Testing auth status..."
+        curl -s "$SERVICE_URL/auth/status" | jq '.'
+        
+        echo "✅ Fresh deployment verification complete!"
+        echo "🎉 ChatCal.ai v0.5.0 with OAuth persistence is live at: $SERVICE_URL"
