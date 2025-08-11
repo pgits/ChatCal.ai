@@ -22,11 +22,12 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
 
-    - name: Google Auth
+    - name: Google Auth (Workload Identity Federation)
       id: auth
       uses: 'google-github-actions/auth@v2'
       with:
-        credentials_json: '${{ secrets.GCP_SA_KEY }}'
+        workload_identity_provider: 'projects/432729289953/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions-provider'
+        service_account: 'github-actions@chatcal-ai-prod-monroe919.iam.gserviceaccount.com'
 
     - name: Set up Cloud SDK
       uses: 'google-github-actions/setup-gcloud@v2'
@@ -39,7 +40,8 @@ jobs:
 
     - name: Build and Push Container
       run: |
-        docker build -t gcr.io/$PROJECT_ID/$SERVICE:$GITHUB_SHA .
+        cd chatcal-ai
+        docker build -f Dockerfile -t gcr.io/$PROJECT_ID/$SERVICE:$GITHUB_SHA .
         docker push gcr.io/$PROJECT_ID/$SERVICE:$GITHUB_SHA
 
     - name: Deploy to Cloud Run
