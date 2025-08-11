@@ -1,0 +1,67 @@
+steps:
+# Step 1: Delete existing service (ignore errors if it doesn't exist)
+- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:latest'
+  id: 'delete-service'
+  entrypoint: 'bash'
+  args:
+  - '-c'
+  - |
+    echo "🗑️ Deleting existing service..."
+    gcloud run services delete chatcal-ai --region=us-east1 --quiet || echo "Service may not exist"
+    echo "✅ Delete step completed"
+
+# Step 2: Build Docker image with current code
+- name: 'gcr.io/cloud-builders/docker'
+  id: 'build-image'
+  args:
+  - 'build'
+  - '-t'
+  - 'gcr.io/$PROJECT_ID/chatcal-ai:v0.5.0-fresh-${SHORT_SHA}'
+  - '.'
+  dir: 'chatcal-ai'
+
+# Step 3: Push the image
+- name: 'gcr.io/cloud-builders/docker'
+  id: 'push-image'
+  args:
+  - 'push'
+  - 'gcr.io/$PROJECT_ID/chatcal-ai:v0.5.0-fresh-${SHORT_SHA}'
+
+# Step 4: Deploy fresh service with OAuth persistence
+- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:latest'
+  id: 'deploy-service'
+  entrypoint: 'gcloud'
+  args:
+  - 'run'
+  - 'deploy'
+  - 'chatcal-ai'
+  - '--image=gcr.io/$PROJECT_ID/chatcal-ai:v0.5.0-fresh-${SHORT_SHA}'
+  - '--platform=managed'
+  - '--region=us-east1'
+  - '--allow-unauthenticated'
+  - '--set-env-vars=GOOGLE_CLIENT_ID=432729289953-gmo9g4i22onoah53ehiilba6dfgu12qu.apps.googleusercontent.com,MY_EMAIL_ADDRESS=pgits.job@gmail.com,MY_PHONE_NUMBER=6308805488,SMTP_USERNAME=pgits.job@gmail.com,ENVIRONMENT=production,TESTING_MODE=false'
+  - '--update-secrets=GROQ_API_KEY=groq-api-key:latest,GOOGLE_CLIENT_SECRET=google-client-secret:latest,SMTP_PASSWORD=smtp-password:latest,SECRET_KEY=secret-key:latest'
+  - '--timeout=300'
+  - '--max-instances=5'
+
+# Step 5: Display service URL and version info
+- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:latest'
+  id: 'display-info'
+  entrypoint: 'bash'
+  args:
+  - '-c'
+  - |
+    echo "🎉 Fresh deployment complete!"
+    SERVICE_URL=$(gcloud run services describe chatcal-ai --platform managed --region us-east1 --format 'value(status.url)')
+    echo "🌐 Service URL: $SERVICE_URL"
+    echo "🔍 Version endpoint: $SERVICE_URL/version"
+    echo "🔐 Auth endpoint: $SERVICE_URL/auth/status"
+    echo "✅ ChatCal.ai v0.5.0 with OAuth persistence is now live!"
+
+substitutions:
+  _SERVICE_NAME: chatcal-ai
+  
+timeout: 1200s
+
+options:
+  logging: CLOUD_LOGGING_ONLY
