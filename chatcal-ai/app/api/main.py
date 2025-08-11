@@ -277,7 +277,7 @@ async def get_version():
             healthy = False
         
         return VersionResponse(
-            app_version="0.3.4",
+            app_version="0.5.0-oauth-persistence",
             git_commit=git_commit,
             git_branch=git_branch,
             build_timestamp=datetime.utcnow(),
