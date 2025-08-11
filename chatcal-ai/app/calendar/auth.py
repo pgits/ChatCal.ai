@@ -33,13 +33,6 @@ class CalendarAuth:
         if not self.client_secret:
             raise ValueError("GOOGLE_CLIENT_SECRET environment variable is required")
         
-        # Debug logging for OAuth configuration
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.info(f"🔐 OAuth Configuration: client_id={self.client_id[:20]}... (length: {len(self.client_id) if self.client_id else 0})")
-        logger.info(f"🔐 Client secret configured: {bool(self.client_secret)}")
-        logger.info(f"🔐 Redirect URI: {self.redirect_uri}")
-        
         # Use environment variable for redirect URI or detect from current deployment
         # For production Cloud Run: use the current service URL
         # For local development: use localhost
@@ -47,6 +40,13 @@ class CalendarAuth:
             "GOOGLE_OAUTH_REDIRECT_URI", 
             "https://chatcal-ai-imoco2uwrq-ue.a.run.app/auth/callback"
         )
+        
+        # Debug logging for OAuth configuration
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"🔐 OAuth Configuration: client_id={self.client_id[:20]}... (length: {len(self.client_id) if self.client_id else 0})")
+        logger.info(f"🔐 Client secret configured: {bool(self.client_secret)}")
+        logger.info(f"🔐 Redirect URI: {self.redirect_uri}")
         self.credentials_path = settings.google_credentials_path
         self._service = None
         
