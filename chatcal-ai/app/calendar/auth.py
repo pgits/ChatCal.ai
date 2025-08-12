@@ -36,9 +36,10 @@ class CalendarAuth:
         # Use environment variable for redirect URI or detect from current deployment
         # For production Cloud Run: use the current service URL
         # For local development: use localhost
+        default_redirect_uri = self._get_default_redirect_uri()
         self.redirect_uri = os.environ.get(
             "GOOGLE_OAUTH_REDIRECT_URI",
-            "https://chatcal-ai-imoco2uwrq-ue.a.run.app/auth/callback"
+            default_redirect_uri
         )
         
         # Debug logging for OAuth configuration
@@ -61,6 +62,30 @@ class CalendarAuth:
         except:
             self.redis_client = None
             self.use_redis = False
+    
+    def _get_default_redirect_uri(self) -> str:
+        """Get the default redirect URI based on the current environment."""
+        # Check for Cloud Run service URL in environment
+        service_url = os.environ.get('CLOUD_RUN_SERVICE_URL')
+        if service_url:
+            return f"{service_url}/auth/callback"
+        
+        # Try to detect from common Cloud Run environment variables
+        service_name = os.environ.get('K_SERVICE')  # Cloud Run service name
+        if service_name:
+            project_id = os.environ.get('GOOGLE_CLOUD_PROJECT', 'chatcal-ai-prod-monroe919')
+            region = os.environ.get('GOOGLE_CLOUD_REGION', 'us-east1')
+            if service_name == 'chatcal-ai-v2':
+                return f"https://{service_name}-432729289953.{region}.run.app/auth/callback"
+            else:
+                return f"https://{service_name}-imoco2uwrq-ue.a.run.app/auth/callback"
+        
+        # Local development fallback
+        if settings.app_env == 'development':
+            return f"http://localhost:{settings.app_port}/auth/callback"
+        
+        # Production fallback (should not reach here in normal operation)
+        return "https://chatcal-ai-v2-432729289953.us-east1.run.app/auth/callback"
     
     def create_auth_flow(self, state: Optional[str] = None) -> Flow:
         """Create OAuth2 flow for authentication."""
