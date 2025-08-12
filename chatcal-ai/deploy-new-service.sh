@@ -17,8 +17,8 @@ echo "🆕 New service: $NEW_SERVICE"
 
 # Build and deploy to new service name
 echo ""
-echo "🔨 Building fresh image..."
-docker build -t gcr.io/$PROJECT_ID/$NEW_SERVICE:$IMAGE_TAG .
+echo "🔨 Building fresh image for AMD64/Linux (Cloud Run requirement)..."
+docker build --platform linux/amd64 -t gcr.io/$PROJECT_ID/$NEW_SERVICE:$IMAGE_TAG .
 docker push gcr.io/$PROJECT_ID/$NEW_SERVICE:$IMAGE_TAG
 
 echo ""
