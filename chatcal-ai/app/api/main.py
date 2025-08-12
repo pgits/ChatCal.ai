@@ -243,7 +243,7 @@ async def health_check():
     
     return HealthResponse(
         status=overall_status,
-        version="0.3.4",
+        version="0.3.5",
         timestamp=datetime.utcnow(),
         services=services
     )
