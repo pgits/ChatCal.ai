@@ -35,12 +35,12 @@ COPY . .
 RUN useradd -m -u 1000 chatbot && chown -R chatbot:chatbot /app
 USER chatbot
 
-# Expose port
+# Expose port (Cloud Run provides PORT env var, default to 8000 for local)
 EXPOSE 8000
 
-# Health check
+# Health check (use PORT env var if available, default to 8000)
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:8000/health')"
+    CMD python -c "import os, requests; requests.get(f'http://localhost:{os.environ.get(\"PORT\", \"8000\")}/health')"
 
-# Run the application
-CMD ["uvicorn", "app.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Run the application (use PORT env var from Cloud Run, default to 8000)
+CMD sh -c "uvicorn app.api.main:app --host 0.0.0.0 --port ${PORT:-8000}"
