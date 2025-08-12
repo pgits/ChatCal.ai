@@ -184,6 +184,16 @@ async def root():
     """
 
 
+@app.get("/debug-deployment-test")
+async def debug_deployment_test():
+    """Debug endpoint that will only exist if new code is deployed."""
+    return {
+        "message": "NEW CODE IS RUNNING!",
+        "version": "0.5.0-FRESH-DEPLOY-SUCCESS", 
+        "timestamp": datetime.utcnow().isoformat(),
+        "deployment_test": "PASSED"
+    }
+
 @app.get("/health", response_model=HealthResponse)
 async def health_check():
     """Health check endpoint."""
